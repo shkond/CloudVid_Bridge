@@ -198,8 +198,11 @@ async def start_worker(background_tasks: BackgroundTasks) -> dict:
 
 
 @router.post("/worker/stop")
-async def stop_worker() -> dict:
+async def stop_worker(background_tasks: BackgroundTasks) -> dict:
     """Stop the queue worker.
+
+    Args:
+        background_tasks: FastAPI background tasks
 
     Returns:
         Status message
@@ -208,9 +211,7 @@ async def stop_worker() -> dict:
     if not worker.is_running():
         return {"message": "Worker not running"}
 
-    import asyncio
-
-    asyncio.create_task(worker.stop())
+    background_tasks.add_task(worker.stop)
     return {"message": "Worker stopping"}
 
 

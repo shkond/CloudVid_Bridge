@@ -27,7 +27,7 @@ class OAuthService:
         """Load credentials from token file if exists."""
         if self.TOKEN_FILE.exists():
             try:
-                with open(self.TOKEN_FILE) as f:
+                with open(self.TOKEN_FILE, encoding="utf-8") as f:
                     token_data = json.load(f)
                 self._credentials = Credentials(
                     token=token_data.get("access_token"),
@@ -43,7 +43,10 @@ class OAuthService:
                 self._credentials = None
 
     def _save_credentials(self) -> None:
-        """Save credentials to token file."""
+        """Save credentials to token file with secure permissions."""
+        import os
+        import stat
+
         if self._credentials:
             token_data = {
                 "access_token": self._credentials.token,
@@ -51,8 +54,14 @@ class OAuthService:
                 "token_uri": self._credentials.token_uri,
                 "scopes": list(self._credentials.scopes or []),
             }
-            with open(self.TOKEN_FILE, "w") as f:
+            # Write to a temporary file first, then rename for atomicity
+            temp_file = self.TOKEN_FILE.with_suffix(".tmp")
+            with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump(token_data, f)
+            # Set restrictive permissions (owner read/write only)
+            os.chmod(temp_file, stat.S_IRUSR | stat.S_IWUSR)
+            # Rename to final location
+            temp_file.rename(self.TOKEN_FILE)
 
     def get_authorization_url(self) -> tuple[str, str]:
         """Generate OAuth authorization URL.

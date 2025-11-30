@@ -101,7 +101,12 @@ class QueueManager:
         return job
 
     def cancel_job(self, job_id: UUID) -> QueueJob | None:
-        """Cancel a pending job.
+        """Cancel a pending or downloading job.
+
+        Note: Only PENDING and DOWNLOADING jobs can be cancelled.
+        UPLOADING jobs cannot be cancelled as the YouTube upload may have
+        already started and partial data may have been sent. To stop an
+        uploading job, you would need to restart the worker.
 
         Args:
             job_id: Job UUID
@@ -113,6 +118,7 @@ class QueueManager:
         if not job:
             return None
 
+        # Only allow cancelling jobs that haven't started uploading to YouTube
         if job.status not in (JobStatus.PENDING, JobStatus.DOWNLOADING):
             return None
 

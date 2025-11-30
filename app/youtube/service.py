@@ -47,6 +47,7 @@ class YouTubeService:
         file_size: int,
         mime_type: str = "video/mp4",
         progress_callback: Any | None = None,
+        file_id: str = "",
     ) -> UploadResult:
         """Upload a video to YouTube using resumable upload.
 
@@ -56,6 +57,7 @@ class YouTubeService:
             file_size: Size of the video file in bytes
             mime_type: Video MIME type
             progress_callback: Optional callback for progress updates
+            file_id: Optional file ID for progress tracking
 
         Returns:
             UploadResult with video ID and URL
@@ -95,7 +97,7 @@ class YouTubeService:
                     progress = status.progress() * 100
                     progress_callback(
                         UploadProgress(
-                            file_id="",
+                            file_id=file_id,
                             status="uploading",
                             progress=progress,
                             bytes_uploaded=int(status.resumable_progress),
@@ -212,6 +214,7 @@ class YouTubeService:
                 file_size,
                 mime_type,
                 adjusted_progress_callback if progress_callback else None,
+                file_id=drive_file_id,
             )
 
             return result
