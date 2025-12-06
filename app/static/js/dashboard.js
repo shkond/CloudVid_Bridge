@@ -403,6 +403,21 @@ async function refreshQueueList() {
         if (elements.startWorkerBtn) elements.startWorkerBtn.disabled = false;
         if (elements.stopWorkerBtn) elements.stopWorkerBtn.disabled = true;
     }
+    // 進捗状況セクションの更新を追加
+    const activeJobs = data.jobs.filter(j =>
+        j.status === 'downloading' || j.status === 'uploading'
+    );
+
+    if (elements.progressInfo) {
+        if (activeJobs.length === 0) {
+            elements.progressInfo.innerHTML =
+                '<p class="empty-state">アップロード中の動画はありません</p>';
+        } else {
+            elements.progressInfo.innerHTML = '';
+            activeJobs.forEach(job => {
+            });
+        }
+    }
 }
 
 // Event Listeners
