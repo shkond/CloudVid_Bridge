@@ -1,47 +1,154 @@
 """Authentication routes."""
 
-from fastapi import APIRouter, HTTPException, Query, status
+from pathlib import Path
 
+from fastapi import APIRouter, Cookie, Form, HTTPException, Query, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+from app.auth.dependencies import check_app_auth, check_google_auth
 from app.auth.oauth import get_oauth_service
 from app.auth.schemas import AuthStatus, AuthURL, UserInfo
+from app.auth.simple_auth import get_session_manager
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
+# Templates setup
+templates_dir = Path(__file__).parent.parent / "templates"
+templates = Jinja2Templates(directory=str(templates_dir))
 
-@router.get("/login", response_model=AuthURL)
-async def login() -> AuthURL:
-    """Get OAuth authorization URL for Google login.
+
+@router.get("/login", response_class=HTMLResponse)
+async def login_page(
+    request: Request,
+    error: str = Query(None),
+    session_token: str | None = Cookie(None, alias="session"),
+) -> HTMLResponse:
+    """Display login page or redirect if already authenticated.
+
+    Args:
+        request: FastAPI request
+        error: Optional error message to display
+        session_token: Session cookie
 
     Returns:
-        AuthURL with authorization URL and state
+        Login page HTML or redirect to dashboard
+    """
+    # If already authenticated, redirect to dashboard
+    if check_app_auth(session_token):
+        return RedirectResponse(url="/auth/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request, "error": error},
+    )
+
+
+@router.post("/login")
+async def login_submit(
+    username: str = Form(...),
+    password: str = Form(...),
+) -> RedirectResponse:
+    """Process login form submission.
+
+    Args:
+        username: Form username
+        password: Form password
+
+    Returns:
+        Redirect to dashboard on success, login page on failure
+    """
+    session_manager = get_session_manager()
+
+    if not session_manager.verify_credentials(username, password):
+        return RedirectResponse(
+            url="/auth/login?error=ユーザー名またはパスワードが正しくありません",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    # Create session and set cookie
+    token = session_manager.create_session_token(username)
+    response = RedirectResponse(url="/auth/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    response.set_cookie(
+        key="session",
+        value=token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 7,  # 7 days
+    )
+    return response
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(
+    request: Request,
+    session_token: str | None = Cookie(None, alias="session"),
+) -> HTMLResponse:
+    """Display dashboard page.
+
+    Args:
+        request: FastAPI request
+        session_token: Session cookie
+
+    Returns:
+        Dashboard page HTML or redirect to login
+    """
+    session_data = check_app_auth(session_token)
+    if not session_data:
+        return RedirectResponse(url="/auth/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    # Check Google auth status
+    google_authenticated = check_google_auth()
+    google_user = None
+
+    if google_authenticated:
+        oauth_service = get_oauth_service()
+        google_user = oauth_service.get_user_info()
+
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {
+            "request": request,
+            "session": session_data,
+            "google_authenticated": google_authenticated,
+            "google_user": google_user,
+        },
+    )
+
+
+@router.get("/google")
+async def google_login() -> RedirectResponse:
+    """Redirect to Google OAuth authorization.
+
+    Returns:
+        Redirect to Google OAuth URL
     """
     oauth_service = get_oauth_service()
-    auth_url, state = oauth_service.get_authorization_url()
-    return AuthURL(authorization_url=auth_url, state=state)
+    auth_url, _ = oauth_service.get_authorization_url()
+    return RedirectResponse(url=auth_url, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/callback")
 async def callback(
     code: str = Query(..., description="Authorization code from Google"),
     state: str = Query(None, description="OAuth state parameter"),
-) -> dict:
+    session_token: str | None = Cookie(None, alias="session"),
+) -> RedirectResponse:
     """Handle OAuth callback from Google.
 
     Args:
         code: Authorization code
         state: OAuth state parameter
+        session_token: Session cookie
 
     Returns:
-        Success message with user info
+        Redirect to dashboard on success
     """
     oauth_service = get_oauth_service()
     try:
         oauth_service.exchange_code(code, state)
-        user_info = oauth_service.get_user_info()
-        return {
-            "message": "Authentication successful",
-            "user": user_info,
-        }
+        return RedirectResponse(url="/auth/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -77,13 +184,16 @@ async def auth_status() -> AuthStatus:
     return AuthStatus(authenticated=True, user=user_info, scopes=scopes)
 
 
-@router.post("/logout")
-async def logout() -> dict:
+@router.get("/logout")
+async def logout() -> RedirectResponse:
     """Logout and clear stored credentials.
 
     Returns:
-        Success message
+        Redirect to login page
     """
     oauth_service = get_oauth_service()
     oauth_service.logout()
-    return {"message": "Logged out successfully"}
+
+    response = RedirectResponse(url="/auth/login", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(key="session")
+    return response

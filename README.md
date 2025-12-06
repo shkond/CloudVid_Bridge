@@ -5,18 +5,22 @@ FastAPI backend for uploading videos from Google Drive to YouTube with resumable
 ## Features
 
 - 🔐 **Google OAuth Authentication** - Secure authentication for Google Drive and YouTube APIs
+- 🔑 **Simple App Authentication** - Session-based login for app access control
+- 🌐 **Web UI** - Modern dark theme dashboard for video management
 - 📁 **Drive Folder Scanning** - Browse and scan Google Drive folders for video files
 - 📤 **Resumable Uploads** - Reliable YouTube uploads with chunked, resumable upload support
 - 📋 **Upload Queue Management** - Queue multiple videos for sequential or concurrent uploads
 - ⚡ **Background Workers** - Async background processing using FastAPI BackgroundTasks
 - 🔄 **Progress Tracking** - Real-time progress updates for downloads and uploads
 - 🐳 **Docker Ready** - Containerized deployment with Docker and docker-compose
+- ☁️ **Heroku Ready** - One-click deployment to Heroku
 - 🚀 **CI/CD Pipeline** - GitHub Actions workflow for linting, testing, and building
 
 ## Technology Stack
 
 - **Python 3.12**
 - **FastAPI** - Modern async web framework
+- **Jinja2** - Template engine for web UI
 - **google-api-python-client** - Google APIs client library
 - **Pydantic** - Data validation using Python type annotations
 - **Docker** - Containerization
@@ -57,12 +61,18 @@ cp .env.example .env
    - Add `http://localhost:8000/auth/callback` as an authorized redirect URI
    - Copy the Client ID and Client Secret to your `.env` file
 
-5. Run the application:
+5. Set app authentication credentials in `.env`:
+```
+AUTH_USERNAME=your-username
+AUTH_PASSWORD=your-secure-password
+```
+
+6. Run the application:
 ```bash
 uvicorn app.main:app --reload
 ```
 
-6. Visit `http://localhost:8000/docs` to access the API documentation.
+7. Visit `http://localhost:8000/auth/login` to access the login page.
 
 ### Docker
 
@@ -77,13 +87,55 @@ docker build --target production -t autouploader .
 docker run -p 8000:8000 --env-file .env autouploader
 ```
 
+### Heroku Deployment
+
+Deploy to Heroku with these steps:
+
+1. Create a Heroku app:
+```bash
+heroku create your-app-name
+```
+
+2. Set environment variables:
+```bash
+heroku config:set GOOGLE_CLIENT_ID=your-client-id
+heroku config:set GOOGLE_CLIENT_SECRET=your-client-secret
+heroku config:set GOOGLE_REDIRECT_URI=https://your-app-name.herokuapp.com/auth/callback
+heroku config:set SECRET_KEY=your-random-secret-key
+heroku config:set AUTH_USERNAME=your-username
+heroku config:set AUTH_PASSWORD=your-secure-password
+heroku config:set APP_ENV=production
+```
+
+3. Deploy:
+```bash
+git push heroku main
+```
+
+4. Update Google Cloud Console:
+   - Add `https://your-app-name.herokuapp.com/auth/callback` as an authorized redirect URI
+
+## Web UI
+
+The application includes a modern web interface:
+
+- **Login Page** (`/auth/login`) - App authentication with username/password
+- **Dashboard** (`/auth/dashboard`) - Main control panel after login
+  - Google account connection
+  - Drive folder selection
+  - Upload queue management
+  - Progress monitoring
+
 ## API Endpoints
 
 ### Authentication
-- `GET /auth/login` - Get OAuth authorization URL
-- `GET /auth/callback` - OAuth callback handler
-- `GET /auth/status` - Check authentication status
-- `POST /auth/logout` - Clear stored credentials
+- `GET /auth/login` - Login page (Web UI)
+- `POST /auth/login` - Process login form
+- `GET /auth/dashboard` - Dashboard page (Web UI)
+- `GET /auth/google` - Redirect to Google OAuth
+- `GET /auth/callback` - Google OAuth callback handler
+- `GET /auth/status` - Check authentication status (API)
+- `GET /auth/logout` - Logout and clear credentials
 
 ### Google Drive
 - `GET /drive/files` - List files in a folder
@@ -111,27 +163,26 @@ docker run -p 8000:8000 --env-file .env autouploader
 
 ```
 autouploader/
+├── Procfile             # Heroku deployment config
+├── runtime.txt          # Python version for Heroku
 ├── app/
-│   ├── __init__.py
 │   ├── main.py          # FastAPI application entry point
 │   ├── config.py        # Application configuration
-│   ├── auth/            # Google OAuth authentication
+│   ├── static/          # Static files (CSS, JS)
+│   │   └── css/
+│   ├── templates/       # Jinja2 templates
+│   │   ├── base.html
+│   │   ├── login.html
+│   │   └── dashboard.html
+│   ├── auth/            # Authentication (OAuth + Simple)
 │   │   ├── oauth.py
+│   │   ├── simple_auth.py
+│   │   ├── dependencies.py
 │   │   ├── routes.py
 │   │   └── schemas.py
 │   ├── drive/           # Google Drive integration
-│   │   ├── service.py
-│   │   ├── routes.py
-│   │   └── schemas.py
 │   ├── youtube/         # YouTube upload functionality
-│   │   ├── service.py
-│   │   ├── routes.py
-│   │   └── schemas.py
 │   └── queue/           # Upload queue management
-│       ├── manager.py
-│       ├── worker.py
-│       ├── routes.py
-│       └── schemas.py
 ├── tests/               # Test files
 ├── .github/workflows/   # CI/CD configuration
 ├── Dockerfile
@@ -154,6 +205,8 @@ autouploader/
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID | (required) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | (required) |
 | `GOOGLE_REDIRECT_URI` | OAuth callback URL | http://localhost:8000/auth/callback |
+| `AUTH_USERNAME` | App login username | (required for production) |
+| `AUTH_PASSWORD` | App login password | (required for production) |
 | `MAX_CONCURRENT_UPLOADS` | Maximum concurrent uploads | 2 |
 | `UPLOAD_CHUNK_SIZE` | Upload chunk size in bytes | 10485760 (10MB) |
 
@@ -166,6 +219,7 @@ For production deployments with higher load, consider:
 3. **Database**: Store job history in PostgreSQL
 4. **Load Balancer**: Deploy multiple app instances behind a load balancer
 5. **Cloud Storage**: Use cloud storage for temporary file handling
+6. **External Session Store**: Use Redis for session persistence across dynos
 
 Example Redis integration is included (commented) in `docker-compose.yml`.
 

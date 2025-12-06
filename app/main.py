@@ -3,9 +3,11 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.auth.routes import router as auth_router
 from app.config import get_settings
@@ -76,6 +78,11 @@ def create_app() -> FastAPI:
     app.include_router(drive_router)
     app.include_router(youtube_router)
     app.include_router(queue_router)
+
+    # Mount static files
+    static_dir = Path(__file__).parent / "static"
+    if static_dir.exists():
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     @app.get("/", tags=["root"])
     async def root() -> dict:

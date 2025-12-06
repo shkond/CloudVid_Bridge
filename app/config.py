@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     max_concurrent_uploads: int = 2
     upload_chunk_size: int = 10 * 1024 * 1024  # 10MB
 
+    # Simple authentication
+    auth_username: str = ""
+    auth_password: str = ""
+
     @property
     def scopes_list(self) -> list[str]:
         """Return Google scopes as a list."""
