@@ -132,16 +132,25 @@ class OAuthService:
         """Get authenticated user information from Google.
 
         Returns:
-            User info dict or None if not authenticated
+            User info dict or None if not authenticated or on error
         """
         creds = self.get_credentials()
         if not creds:
             return None
 
-        from googleapiclient.discovery import build
+        try:
+            from googleapiclient.discovery import build
 
-        service = build("oauth2", "v2", credentials=creds)
-        return service.userinfo().get().execute()
+            service = build("oauth2", "v2", credentials=creds)
+            return service.userinfo().get().execute()
+        except Exception as e:
+        # ログに記録してセキュリティ監査を可能にする
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to get user info: {type(e).__name__}")
+            # 詳細なエラーはデバッグレベルで
+            logger.debug(f"User info error details: {e}")
+            return None
 
     def _create_flow(self) -> Flow:
         """Create OAuth flow from settings."""
