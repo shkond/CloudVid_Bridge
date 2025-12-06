@@ -1,4 +1,4 @@
-# AutoUploader
+# CloudVid Bridge
 
 FastAPI backend for uploading videos from Google Drive to YouTube with resumable uploads, queue management, and OAuth authentication.
 
@@ -45,8 +45,8 @@ FastAPI backend for uploading videos from Google Drive to YouTube with resumable
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/shkond/autouploader.git
-cd autouploader
+git clone https://github.com/shkond/cloudvid-bridge.git
+cd cloudvid-bridge
 ```
 
 2. Create a virtual environment and install dependencies:
@@ -95,8 +95,8 @@ Build and run with Docker:
 docker-compose up --build
 
 # Production mode
-docker build --target production -t autouploader .
-docker run -p 8000:8000 --env-file .env autouploader
+docker build --target production -t cloudvid-bridge .
+docker run -p 8000:8000 --env-file .env cloudvid-bridge
 ```
 
 ### Heroku Deployment
@@ -201,7 +201,7 @@ The application includes a modern web interface:
 ## Project Structure
 
 ```
-autouploader/
+cloudvid-bridge/
 ├── Procfile             # Heroku deployment config
 ├── runtime.txt          # Python version for Heroku
 ├── app/
@@ -235,7 +235,7 @@ autouploader/
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `APP_NAME` | Application name | AutoUploader |
+| `APP_NAME` | Application name | CloudVid Bridge |
 | `APP_ENV` | Environment (development/production) | development |
 | `DEBUG` | Enable debug mode | true |
 | `SECRET_KEY` | Application secret key | (required) |
@@ -246,7 +246,7 @@ autouploader/
 | `GOOGLE_REDIRECT_URI` | OAuth callback URL | http://localhost:8000/auth/callback |
 | `AUTH_USERNAME` | App login username | (required for production) |
 | `AUTH_PASSWORD` | App login password | (required for production) |
-| `DATABASE_URL` | Database connection URL | sqlite+aiosqlite:///./autouploader.db |
+| `DATABASE_URL` | Database connection URL | sqlite+aiosqlite:///./cloudvid_bridge.db |
 | `MAX_CONCURRENT_UPLOADS` | Maximum concurrent uploads | 2 |
 | `UPLOAD_CHUNK_SIZE` | Upload chunk size in bytes | 10485760 (10MB) |
 

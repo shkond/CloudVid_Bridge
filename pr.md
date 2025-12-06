@@ -1,5 +1,5 @@
 PR #2: requirment add
-URL: https://github.com/shkond/autouploader/pull/2
+URL: https://github.com/shkond/cloudvid-bridge/pull/2
 
 内容:
 - 永続化キュー（DBベースの QueueJobModel）を導入
@@ -24,7 +24,7 @@ URL: https://github.com/shkond/autouploader/pull/2
 ---
 
 PR #3: Pr3
-URL: https://github.com/shkond/autouploader/pull/3
+URL: https://github.com/shkond/cloudvid-bridge/pull/3
 
 内容:
 - DBへ OAuth トークンとアップロードキューを移行し、永続化を実装
@@ -48,7 +48,7 @@ URL: https://github.com/shkond/autouploader/pull/3
 ---
 
 PR #4: pr4
-URL: https://github.com/shkond/autouploader/pull/4
+URL: https://github.com/shkond/cloudvid-bridge/pull/4
 
 内容:
 - アップロードジョブ管理をインメモリから DB バックエンドへ移行(`QueueManagerDB`)

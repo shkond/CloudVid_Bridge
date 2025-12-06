@@ -1,5 +1,5 @@
 /**
- * AutoUploader Dashboard JavaScript
+ * CloudVid Bridge Dashboard JavaScript
  * Handles folder browsing, upload settings, and queue management
  */
 

@@ -1,4 +1,4 @@
-"""Database models for AutoUploader."""
+"""Database models for CloudVid Bridge."""
 
 from datetime import datetime
 
