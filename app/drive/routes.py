@@ -1,11 +1,23 @@
 """Google Drive routes."""
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.drive.schemas import DriveFile, FolderScanRequest, FolderScanResponse
+from app.database import get_db
+from app.drive.schemas import (
+    DriveFile,
+    FolderScanRequest,
+    FolderScanResponse,
+    FolderUploadRequest,
+    FolderUploadResponse,
+    SkippedFile,
+)
 from app.drive.service import get_drive_service
+from app.queue.manager import get_queue_manager
+from app.queue.schemas import QueueJob
 
 router = APIRouter(prefix="/drive", tags=["google-drive"])
+
 
 
 @router.get("/files", response_model=list[DriveFile])
@@ -93,3 +105,171 @@ async def get_file_info(file_id: str) -> dict:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"File not found: {e!s}",
         ) from e
+
+
+@router.post("/folder/upload", response_model=FolderUploadResponse)
+async def upload_folder(
+    request: FolderUploadRequest,
+    db: AsyncSession = Depends(get_db),
+) -> FolderUploadResponse:
+    """Upload all videos from a Drive folder to YouTube.
+
+    Scans the folder for video files and adds them to the upload queue.
+    Supports duplicate detection via MD5 hash.
+
+    Args:
+        request: Folder upload request with settings
+        db: Database session
+
+    Returns:
+        FolderUploadResponse with added and skipped file counts
+    """
+    import uuid
+    from datetime import date
+
+    from sqlalchemy import select
+
+    from app.models import UploadHistory
+    from app.queue.schemas import QueueJobCreate
+    from app.youtube.schemas import PrivacyStatus, VideoMetadata
+
+    try:
+        drive_service = get_drive_service()
+        queue_manager = get_queue_manager()
+
+        # Get folder info
+        if request.folder_id == "root":
+            folder_name = "My Drive"
+        else:
+            folder_info = drive_service.get_folder_info(request.folder_id)
+            folder_name = folder_info["name"]
+
+        # Generate batch ID
+        batch_id = str(uuid.uuid4())
+
+        # Get all videos in folder
+        video_files = drive_service.get_all_videos_flat(
+            folder_id=request.folder_id,
+            recursive=request.recursive,
+            max_files=request.max_files,
+        )
+
+        added_jobs: list[QueueJob] = []
+        skipped_files: list[SkippedFile] = []
+
+        for file_meta, folder_path in video_files:
+            file_id = file_meta["id"]
+            file_name = file_meta["name"]
+            md5_checksum = file_meta.get("md5Checksum", "")
+
+            # Check for duplicates
+            if request.skip_duplicates:
+                # Check if already in queue
+                if queue_manager.is_file_id_in_queue(file_id):
+                    skipped_files.append(SkippedFile(
+                        file_id=file_id,
+                        file_name=file_name,
+                        reason="already_in_queue",
+                    ))
+                    continue
+
+                if md5_checksum and queue_manager.is_md5_in_queue(md5_checksum):
+                    skipped_files.append(SkippedFile(
+                        file_id=file_id,
+                        file_name=file_name,
+                        reason="duplicate_md5_in_queue",
+                    ))
+                    continue
+
+                # Check if already uploaded (in database)
+                if md5_checksum:
+                    result = await db.execute(
+                        select(UploadHistory).where(
+                            UploadHistory.drive_md5_checksum == md5_checksum
+                        )
+                    )
+                    existing = result.scalar_one_or_none()
+                    if existing:
+                        skipped_files.append(SkippedFile(
+                            file_id=file_id,
+                            file_name=file_name,
+                            reason=f"already_uploaded:{existing.youtube_video_id}",
+                        ))
+                        continue
+
+            # Generate video metadata from template
+            settings = request.settings
+            today = date.today().isoformat()
+
+            # Remove file extension for title
+            title_base = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
+
+            # Process templates
+            title = settings.title_template.format(
+                filename=title_base,
+                folder=folder_name,
+                folder_path=folder_path,
+                upload_date=today,
+            )
+
+            description = settings.description_template.format(
+                filename=title_base,
+                folder=folder_name,
+                folder_path=folder_path,
+                upload_date=today,
+            )
+
+            # Add MD5 hash to description if enabled
+            if settings.include_md5_hash and md5_checksum:
+                description += f"\n\n[MD5:{md5_checksum}]"
+
+            # Map privacy status
+            privacy_map = {
+                "public": PrivacyStatus.PUBLIC,
+                "private": PrivacyStatus.PRIVATE,
+                "unlisted": PrivacyStatus.UNLISTED,
+            }
+            privacy = privacy_map.get(settings.default_privacy, PrivacyStatus.PRIVATE)
+
+            video_metadata = VideoMetadata(
+                title=title[:100],  # YouTube title limit
+                description=description[:5000],  # YouTube description limit
+                tags=settings.default_tags,
+                category_id=settings.default_category_id,
+                privacy_status=privacy,
+                made_for_kids=settings.made_for_kids,
+            )
+
+            # Create queue job
+            job_create = QueueJobCreate(
+                drive_file_id=file_id,
+                drive_file_name=file_name,
+                drive_md5_checksum=md5_checksum,
+                folder_path=folder_path,
+                batch_id=batch_id,
+                metadata=video_metadata,
+            )
+
+            job = queue_manager.add_job(job_create)
+            added_jobs.append(job)
+
+        return FolderUploadResponse(
+            folder_name=folder_name,
+            batch_id=batch_id,
+            added_count=len(added_jobs),
+            skipped_count=len(skipped_files),
+            skipped_files=skipped_files,
+            message=f"Added {len(added_jobs)} video(s) to queue, skipped {len(skipped_files)}",
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload folder: {e!s}",
+        ) from e
+

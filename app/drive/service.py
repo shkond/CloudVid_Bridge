@@ -61,7 +61,7 @@ class DriveService:
 
         fields = (
             "nextPageToken, files(id, name, mimeType, size, createdTime, "
-            "modifiedTime, parents, thumbnailLink, webViewLink)"
+            "modifiedTime, parents, thumbnailLink, webViewLink, md5Checksum)"
         )
 
         files: list[DriveFile] = []
@@ -187,22 +187,74 @@ class DriveService:
         return buffer, downloader
 
     def get_file_metadata(self, file_id: str) -> dict[str, Any]:
-        """Get file metadata.
+        """Get file metadata including MD5 checksum.
 
         Args:
             file_id: Drive file ID
 
         Returns:
-            File metadata dict
+            File metadata dict with md5Checksum
         """
         return (
             self.service.files()
             .get(
                 fileId=file_id,
-                fields="id, name, mimeType, size, createdTime, modifiedTime",
+                fields="id, name, mimeType, size, createdTime, modifiedTime, md5Checksum",
             )
             .execute()
         )
+
+    def get_all_videos_flat(
+        self,
+        folder_id: str,
+        recursive: bool = False,
+        max_files: int = 100,
+        folder_path: str = "",
+    ) -> list[tuple[dict[str, Any], str]]:
+        """Get all video files from a folder as a flat list.
+
+        Args:
+            folder_id: Drive folder ID
+            recursive: Whether to scan subfolders
+            max_files: Maximum number of files to return
+            folder_path: Current folder path (for tracking)
+
+        Returns:
+            List of tuples (file_metadata, folder_path)
+        """
+        result: list[tuple[dict[str, Any], str]] = []
+
+        # Get folder info for path
+        if folder_id == "root":
+            current_path = folder_path or "My Drive"
+        else:
+            folder_info = self.get_folder_info(folder_id)
+            current_path = f"{folder_path}/{folder_info['name']}" if folder_path else folder_info["name"]
+
+        # List files in folder
+        files = self.list_files(folder_id, video_only=True)
+
+        for file in files:
+            if len(result) >= max_files:
+                break
+
+            if file.file_type == FileType.VIDEO:
+                # Get full metadata including MD5
+                file_meta = self.get_file_metadata(file.id)
+                file_meta["folder_path"] = current_path
+                result.append((file_meta, current_path))
+
+            elif file.file_type == FileType.FOLDER and recursive:
+                if len(result) < max_files:
+                    sub_files = self.get_all_videos_flat(
+                        file.id,
+                        recursive=True,
+                        max_files=max_files - len(result),
+                        folder_path=current_path,
+                    )
+                    result.extend(sub_files)
+
+        return result[:max_files]
 
     @staticmethod
     def _determine_file_type(mime_type: str) -> FileType:

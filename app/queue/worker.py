@@ -6,7 +6,7 @@ from typing import Any
 
 from app.config import get_settings
 from app.queue.manager import get_queue_manager
-from app.queue.schemas import JobStatus
+from app.queue.schemas import JobStatus, QueueJob
 from app.youtube.schemas import UploadProgress
 from app.youtube.service import get_youtube_service
 
@@ -123,6 +123,13 @@ class QueueWorker:
                     video_url=result.video_url,
                 )
                 logger.info("Job %s completed: video_id=%s", job.id, result.video_id)
+
+                # Save upload history to database
+                await self._save_upload_history(
+                    job=job,
+                    video_id=result.video_id or "",
+                    video_url=result.video_url or "",
+                )
             else:
                 queue_manager.update_job(
                     job_id,
@@ -148,6 +155,46 @@ class QueueWorker:
             True if running
         """
         return self._running
+
+    async def _save_upload_history(
+        self,
+        job: "QueueJob",
+        video_id: str,
+        video_url: str,
+    ) -> None:
+        """Save upload history to database.
+
+        Args:
+            job: Completed queue job
+            video_id: YouTube video ID
+            video_url: YouTube video URL
+        """
+        from datetime import datetime, timezone
+
+        from app.database import get_db_context
+        from app.models import UploadHistory
+
+        try:
+            async with get_db_context() as db:
+                history = UploadHistory(
+                    drive_file_id=job.drive_file_id,
+                    drive_file_name=job.drive_file_name,
+                    drive_md5_checksum=job.drive_md5_checksum or "",
+                    youtube_video_id=video_id,
+                    youtube_video_url=video_url,
+                    folder_path=job.folder_path or "",
+                    status="completed",
+                    uploaded_at=datetime.now(timezone.utc),
+                )
+                db.add(history)
+                logger.info(
+                    "Saved upload history: %s -> %s",
+                    job.drive_file_name,
+                    video_id,
+                )
+        except Exception:
+            logger.exception("Failed to save upload history for job %s", job.id)
+
 
 
 # Singleton instance

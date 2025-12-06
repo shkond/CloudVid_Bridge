@@ -33,12 +33,16 @@ class QueueManager:
         job = QueueJob(
             drive_file_id=job_create.drive_file_id,
             drive_file_name=job_create.drive_file_name,
+            drive_md5_checksum=job_create.drive_md5_checksum,
+            folder_path=job_create.folder_path,
+            batch_id=job_create.batch_id,
             metadata=job_create.metadata,
             status=JobStatus.PENDING,
         )
         self._jobs[job.id] = job
         logger.info("Added job %s for file %s", job.id, job.drive_file_name)
         return job
+
 
     def get_job(self, job_id: UUID) -> QueueJob | None:
         """Get a job by ID.
@@ -222,6 +226,51 @@ class QueueManager:
         for job_id in completed_ids:
             del self._jobs[job_id]
         return len(completed_ids)
+
+    def is_file_id_in_queue(self, drive_file_id: str) -> bool:
+        """Check if a file ID is already in the queue (pending or active).
+
+        Args:
+            drive_file_id: Google Drive file ID
+
+        Returns:
+            True if file is already in queue
+        """
+        active_statuses = {JobStatus.PENDING, JobStatus.DOWNLOADING, JobStatus.UPLOADING}
+        return any(
+            job.drive_file_id == drive_file_id and job.status in active_statuses
+            for job in self._jobs.values()
+        )
+
+    def is_md5_in_queue(self, md5_checksum: str) -> bool:
+        """Check if a file with given MD5 is already in the queue.
+
+        Args:
+            md5_checksum: MD5 checksum of the file
+
+        Returns:
+            True if file with same MD5 is in queue
+        """
+        if not md5_checksum:
+            return False
+        active_statuses = {JobStatus.PENDING, JobStatus.DOWNLOADING, JobStatus.UPLOADING}
+        return any(
+            job.drive_md5_checksum == md5_checksum and job.status in active_statuses
+            for job in self._jobs.values()
+        )
+
+    def get_jobs_by_batch(self, batch_id: str) -> list[QueueJob]:
+        """Get all jobs for a specific batch.
+
+        Args:
+            batch_id: Batch ID
+
+        Returns:
+            List of jobs in the batch
+        """
+        return [job for job in self._jobs.values() if job.batch_id == batch_id]
+
+
 
 
 # Singleton instance

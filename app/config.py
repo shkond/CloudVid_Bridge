@@ -55,6 +55,23 @@ class Settings(BaseSettings):
         """Check if running in production."""
         return self.app_env == "production"
 
+    @property
+    def async_database_url(self) -> str:
+        """Get async-compatible database URL.
+
+        Converts Heroku's postgres:// to postgresql+asyncpg://
+        and sqlite:// to sqlite+aiosqlite://
+        """
+        url = self.database_url
+        if url.startswith("postgres://"):
+            return url.replace("postgres://", "postgresql+asyncpg://", 1)
+        if url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if url.startswith("sqlite://"):
+            return url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+        return url
+
+
 
 @lru_cache
 def get_settings() -> Settings:

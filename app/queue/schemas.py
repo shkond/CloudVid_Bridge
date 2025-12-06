@@ -26,6 +26,9 @@ class QueueJob(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     drive_file_id: str
     drive_file_name: str
+    drive_md5_checksum: str | None = None
+    folder_path: str | None = None
+    batch_id: str | None = None
     metadata: VideoMetadata
     status: JobStatus = JobStatus.PENDING
     progress: float = Field(default=0.0, ge=0, le=100)
@@ -45,7 +48,11 @@ class QueueJobCreate(BaseModel):
 
     drive_file_id: str = Field(..., description="Google Drive file ID")
     drive_file_name: str = Field(..., description="Original file name")
+    drive_md5_checksum: str | None = Field(None, description="MD5 checksum for deduplication")
+    folder_path: str | None = Field(None, description="Folder path in Drive")
+    batch_id: str | None = Field(None, description="Batch ID for grouping jobs")
     metadata: VideoMetadata
+
 
 
 class QueueJobResponse(BaseModel):

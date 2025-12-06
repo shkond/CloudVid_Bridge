@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.auth.routes import router as auth_router
 from app.config import get_settings
+from app.database import close_db, init_db
 from app.drive.routes import router as drive_router
 from app.queue.routes import router as queue_router
 from app.queue.worker import get_queue_worker
@@ -35,6 +36,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_settings()
     logger.info("App: %s, Environment: %s", settings.app_name, settings.app_env)
 
+    # Initialize database
+    logger.info("Initializing database...")
+    await init_db()
+    logger.info("Database initialized successfully")
+
     yield
 
     # Shutdown
@@ -42,6 +48,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     worker = get_queue_worker()
     if worker.is_running():
         await worker.stop()
+
+    # Close database connections
+    await close_db()
+    logger.info("Database connections closed")
+
 
 
 def create_app() -> FastAPI:
