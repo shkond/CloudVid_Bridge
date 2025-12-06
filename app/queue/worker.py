@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import UTC
 from typing import Any
 
 from app.config import get_settings
@@ -169,7 +170,7 @@ class QueueWorker:
             video_id: YouTube video ID
             video_url: YouTube video URL
         """
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from app.database import get_db_context
         from app.models import UploadHistory
@@ -184,7 +185,7 @@ class QueueWorker:
                     youtube_video_url=video_url,
                     folder_path=job.folder_path or "",
                     status="completed",
-                    uploaded_at=datetime.now(timezone.utc),
+                    uploaded_at=datetime.now(UTC),
                 )
                 db.add(history)
                 logger.info(

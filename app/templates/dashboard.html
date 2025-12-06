@@ -74,6 +74,7 @@
         </section>
         {% else %}
         <div class="dashboard-grid">
+            <!-- Drive Folder Section -->
             <section class="card drive-section">
                 <div class="card-header">
                     <h2>
@@ -87,15 +88,61 @@
                 <div class="card-body">
                     <p>動画ファイルを選択するフォルダを指定してください。</p>
                     <div class="folder-selector">
-                        <input type="text" id="folder-path" placeholder="フォルダパスを入力..." readonly>
+                        <input type="text" id="folder-path" placeholder="フォルダを選択..." readonly>
+                        <input type="hidden" id="folder-id" value="">
                         <button id="browse-folders" class="btn-secondary">参照</button>
                     </div>
-                    <div id="video-list" class="video-list">
-                        <p class="empty-state">フォルダを選択すると動画一覧が表示されます</p>
+
+                    <!-- Upload Settings -->
+                    <div class="upload-settings" id="upload-settings" style="display: none;">
+                        <h3>アップロード設定</h3>
+                        <div class="setting-row">
+                            <label for="title-template">タイトル形式</label>
+                            <input type="text" id="title-template" value="{filename}"
+                                placeholder="{filename}, {folder}, {folder_path}, {upload_date}">
+                        </div>
+                        <div class="setting-row">
+                            <label for="description-template">説明</label>
+                            <textarea id="description-template" rows="2" placeholder="{folder_path}からアップロード"></textarea>
+                        </div>
+                        <div class="setting-row">
+                            <label for="privacy-status">公開設定</label>
+                            <select id="privacy-status">
+                                <option value="private" selected>非公開</option>
+                                <option value="unlisted">限定公開</option>
+                                <option value="public">公開</option>
+                            </select>
+                        </div>
+                        <div class="setting-row checkbox-row">
+                            <label>
+                                <input type="checkbox" id="recursive" checked> サブフォルダも含める
+                            </label>
+                            <label>
+                                <input type="checkbox" id="skip-duplicates" checked> 重複スキップ
+                            </label>
+                            <label>
+                                <input type="checkbox" id="include-md5" checked> MD5ハッシュを追加
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Video Preview List -->
+                    <div id="video-preview" class="video-preview" style="display: none;">
+                        <div class="preview-header">
+                            <h3>動画プレビュー (<span id="video-count">0</span>件)</h3>
+                            <button id="scan-folder" class="btn-secondary">スキャン</button>
+                        </div>
+                        <div id="video-list" class="video-list">
+                            <p class="empty-state">スキャンを実行してください</p>
+                        </div>
+                        <div class="preview-actions">
+                            <button id="add-to-queue" class="btn-primary" disabled>キューに追加</button>
+                        </div>
                     </div>
                 </div>
             </section>
 
+            <!-- Upload Queue Section -->
             <section class="card queue-section">
                 <div class="card-header">
                     <h2>
@@ -109,7 +156,11 @@
                         </svg>
                         アップロードキュー
                     </h2>
-                    <span class="badge" id="queue-count">0</span>
+                    <div class="queue-actions">
+                        <span class="badge" id="queue-count">0</span>
+                        <button id="start-worker" class="btn-small btn-success">開始</button>
+                        <button id="stop-worker" class="btn-small btn-danger" disabled>停止</button>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div id="queue-list" class="queue-list">
@@ -118,6 +169,7 @@
                 </div>
             </section>
 
+            <!-- Progress Section -->
             <section class="card progress-section">
                 <div class="card-header">
                     <h2>
@@ -139,19 +191,34 @@
         {% endif %}
     </main>
 </div>
+
+<!-- Folder Browser Modal -->
+<div id="folder-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>フォルダを選択</h2>
+            <button class="modal-close" id="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="breadcrumb" id="folder-breadcrumb">
+                <span class="breadcrumb-item" data-id="root">My Drive</span>
+            </div>
+            <div class="folder-list" id="folder-list">
+                <p class="loading">読み込み中...</p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="select-folder" class="btn-primary" disabled>選択</button>
+            <button id="cancel-select" class="btn-secondary">キャンセル</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notifications -->
+<div id="toast-container" class="toast-container"></div>
+
 {% endblock %}
 
 {% block scripts %}
-<script>
-    // Dashboard functionality will be added here
-    document.addEventListener('DOMContentLoaded', function () {
-        const browseBtn = document.getElementById('browse-folders');
-        if (browseBtn) {
-            browseBtn.addEventListener('click', async function () {
-                // Placeholder for folder browsing
-                alert('フォルダ選択機能は開発中です');
-            });
-        }
-    });
-</script>
+<script src="/static/js/dashboard.js"></script>
 {% endblock %}

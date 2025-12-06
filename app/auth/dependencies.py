@@ -1,7 +1,6 @@
 """Authentication dependencies for route protection."""
 
 from fastapi import Cookie, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
 
 from app.auth.oauth import get_oauth_service
 from app.auth.simple_auth import get_session_manager

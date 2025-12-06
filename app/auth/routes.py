@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.auth.dependencies import check_app_auth, check_google_auth
 from app.auth.oauth import get_oauth_service
-from app.auth.schemas import AuthStatus, AuthURL, UserInfo
+from app.auth.schemas import AuthStatus, UserInfo
 from app.auth.simple_auth import get_session_manager
 
 router = APIRouter(prefix="/auth", tags=["authentication"])

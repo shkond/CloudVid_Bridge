@@ -1,8 +1,6 @@
 """Simple session-based authentication for app access."""
 
-import hashlib
 import hmac
-import json
 import time
 from typing import Any
 
