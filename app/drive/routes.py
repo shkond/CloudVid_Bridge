@@ -4,6 +4,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import check_app_auth, get_current_user_from_session
+from app.auth.oauth import get_oauth_service
 from app.database import get_db
 from app.drive.schemas import (
     DriveFile,
@@ -13,7 +14,8 @@ from app.drive.schemas import (
     FolderUploadResponse,
     SkippedFile,
 )
-from app.drive.service import get_drive_service
+# Note: DriveService is imported per-request to avoid issues with credentials
+# and multi-user contexts; use get_oauth_service() to construct DriveService instances with user-specific credentials.
 from app.queue.manager_db import QueueManagerDB
 from app.queue.schemas import QueueJob
 
@@ -25,6 +27,7 @@ router = APIRouter(prefix="/drive", tags=["google-drive"])
 async def list_files(
     folder_id: str = Query(default="root", description="Drive folder ID"),
     video_only: bool = Query(default=True, description="Filter to video files only"),
+    session_token: str | None = Cookie(None, alias="session"),
 ) -> list[DriveFile]:
     """List files in a Drive folder.
 
@@ -36,7 +39,22 @@ async def list_files(
         List of files in the folder
     """
     try:
-        service = get_drive_service()
+        # Validate session and get user_id
+        session_data = check_app_auth(session_token)
+        if not session_data:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+        user_id = get_current_user_from_session(session_data)
+
+        oauth_service = get_oauth_service()
+        credentials = await oauth_service.get_credentials(user_id)
+        if not credentials:
+            raise ValueError("Not authenticated with Google")
+
+        from app.drive.service import DriveService
+        service = DriveService(credentials)
         return service.list_files(folder_id, video_only)
     except ValueError as e:
         raise HTTPException(
@@ -51,7 +69,10 @@ async def list_files(
 
 
 @router.post("/scan", response_model=FolderScanResponse)
-async def scan_folder(request: FolderScanRequest) -> FolderScanResponse:
+async def scan_folder(
+    request: FolderScanRequest,
+    session_token: str | None = Cookie(None, alias="session"),
+) -> FolderScanResponse:
     """Scan a Drive folder for video files.
 
     Args:
@@ -61,7 +82,21 @@ async def scan_folder(request: FolderScanRequest) -> FolderScanResponse:
         FolderScanResponse with folder contents
     """
     try:
-        service = get_drive_service()
+        session_data = check_app_auth(session_token)
+        if not session_data:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+        user_id = get_current_user_from_session(session_data)
+
+        oauth_service = get_oauth_service()
+        credentials = await oauth_service.get_credentials(user_id)
+        if not credentials:
+            raise ValueError("Not authenticated with Google")
+
+        from app.drive.service import DriveService
+        service = DriveService(credentials)
         folder = service.scan_folder(
             folder_id=request.folder_id,
             recursive=request.recursive,
@@ -84,7 +119,7 @@ async def scan_folder(request: FolderScanRequest) -> FolderScanResponse:
 
 
 @router.get("/file/{file_id}")
-async def get_file_info(file_id: str) -> dict:
+async def get_file_info(file_id: str, session_token: str | None = Cookie(None, alias="session")) -> dict:
     """Get information about a specific file.
 
     Args:
@@ -94,7 +129,21 @@ async def get_file_info(file_id: str) -> dict:
         File metadata
     """
     try:
-        service = get_drive_service()
+        session_data = check_app_auth(session_token)
+        if not session_data:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+        user_id = get_current_user_from_session(session_data)
+
+        oauth_service = get_oauth_service()
+        credentials = await oauth_service.get_credentials(user_id)
+        if not credentials:
+            raise ValueError("Not authenticated with Google")
+
+        from app.drive.service import DriveService
+        service = DriveService(credentials)
         return service.get_file_metadata(file_id)
     except ValueError as e:
         raise HTTPException(
@@ -145,7 +194,12 @@ async def upload_folder(
             )
         user_id = get_current_user_from_session(session_data)
 
-        drive_service = get_drive_service()
+        oauth_service = get_oauth_service()
+        credentials = await oauth_service.get_credentials(user_id)
+        if not credentials:
+            raise ValueError("Not authenticated with Google")
+        from app.drive.service import DriveService
+        drive_service = DriveService(credentials)
 
         # Get folder info
         if request.folder_id == "root":

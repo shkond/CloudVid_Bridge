@@ -19,6 +19,7 @@ from tenacity import (
 from app.auth.oauth import get_oauth_service
 from app.config import get_settings
 from app.drive.service import get_drive_service
+from app.drive.service import DriveService
 from app.youtube.quota import get_quota_tracker
 from app.youtube.schemas import (
     UploadProgress,
@@ -175,6 +176,8 @@ class YouTubeService:
         drive_file_id: str,
         metadata: VideoMetadata,
         progress_callback: Any | None = None,
+        drive_credentials: Credentials | None = None,
+        file_id: str | None = "",
     ) -> UploadResult:
         """Upload a video from Google Drive to YouTube.
 
@@ -190,8 +193,11 @@ class YouTubeService:
             UploadResult with video ID and URL
         """
         try:
-            # Get Drive service
-            drive_service = get_drive_service()
+            # Get Drive service (prefer provided credentials, otherwise fallback)
+            if drive_credentials:
+                drive_service = DriveService(drive_credentials)
+            else:
+                drive_service = get_drive_service()
 
             # Get file metadata
             file_info = drive_service.get_file_metadata(drive_file_id)
@@ -487,6 +493,7 @@ class YouTubeService:
         drive_file_id: str,
         metadata: VideoMetadata,
         progress_callback: Any | None = None,
+        drive_credentials: Credentials | None = None,
     ) -> UploadResult:
         """Upload a video from Google Drive to YouTube with retry logic.
 
@@ -520,6 +527,7 @@ class YouTubeService:
             drive_file_id=drive_file_id,
             metadata=metadata,
             progress_callback=progress_callback,
+            drive_credentials=drive_credentials,
         )
 
         # Track the upload operation

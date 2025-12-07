@@ -10,7 +10,8 @@ from app.config import get_settings
 # Removed: from app.queue.manager import get_queue_manager
 from app.queue.schemas import JobStatus, QueueJob
 from app.youtube.schemas import UploadProgress
-from app.youtube.service import get_youtube_service
+from app.youtube.service import YouTubeService
+from app.auth.oauth import get_oauth_service
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +89,12 @@ class QueueWorker:
             logger.info("Processing job %s: %s", job.id, job.drive_file_name)
 
         try:
-            # Get YouTube service
-            youtube_service = get_youtube_service()
+            # Get YouTube service for the job user
+            oauth_service = get_oauth_service()
+            credentials = await oauth_service.get_credentials(job.user_id)
+            if not credentials:
+                raise Exception("User not authenticated with Google")
+            youtube_service = YouTubeService(credentials)
 
             # Pre-upload check: verify if video was already uploaded
             skip_result = await self._pre_upload_check(job, youtube_service)
@@ -140,6 +145,7 @@ class QueueWorker:
                 drive_file_id=job.drive_file_id,
                 metadata=job.metadata,
                 progress_callback=progress_callback,
+                drive_credentials=credentials,
             )
 
             async with get_db_context() as db:
