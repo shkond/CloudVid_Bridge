@@ -50,8 +50,8 @@ def _is_retryable_error(exception: BaseException) -> bool:
                     .get("errors", [{}])[0]
                     .get("reason", "")
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Could not parse HttpError content for retry check: %s", e)
             
             # Retry on quota/rate limit errors, but not on permission errors
             if error_reason in ["quotaExceeded", "rateLimitExceeded", "userRateLimitExceeded"]:
