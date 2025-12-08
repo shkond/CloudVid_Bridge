@@ -52,6 +52,7 @@ class QueueJobCreate(BaseModel):
     drive_md5_checksum: str | None = Field(None, description="MD5 checksum for deduplication")
     folder_path: str | None = Field(None, description="Folder path in Drive")
     batch_id: str | None = Field(None, description="Batch ID for grouping jobs")
+    file_size: int | None = Field(None, description="File size in bytes for validation")
     metadata: VideoMetadata
 
 

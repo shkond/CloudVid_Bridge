@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     max_concurrent_uploads: int = 2
     upload_chunk_size: int = 10 * 1024 * 1024  # 10MB
 
+    # File size limits
+    max_file_size: int = 5 * 1024 * 1024 * 1024  # 5GB - hard limit (rejected)
+    warning_file_size: int = 4 * 1024 * 1024 * 1024  # 4GB - soft warning
+
     # Simple authentication
     auth_username: str = ""
     auth_password: str = ""

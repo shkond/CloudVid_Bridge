@@ -301,10 +301,16 @@ function flattenVideos(folder, path = '') {
     return videos;
 }
 
+// File size limits (in bytes) - should match backend config
+const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB
+const WARNING_FILE_SIZE = 4 * 1024 * 1024 * 1024; // 4GB
+
 function renderVideoList(videos) {
     if (!elements.videoList) return;
 
     elements.videoList.innerHTML = '';
+
+    let hasOversizedFiles = false;
 
     videos.forEach(video => {
         const item = document.createElement('div');
@@ -312,16 +318,43 @@ function renderVideoList(videos) {
 
         const sizeStr = video.size ? formatBytes(video.size) : 'N/A';
 
+        // Determine file size status
+        let sizeClass = '';
+        let sizeIcon = '';
+        let sizeTooltip = '';
+
+        if (video.size && video.size > MAX_FILE_SIZE) {
+            sizeClass = 'size-error';
+            sizeIcon = '⚠️';
+            sizeTooltip = ' (ファイルサイズ超過: 5GB以下にしてください)';
+            hasOversizedFiles = true;
+        } else if (video.size && video.size > WARNING_FILE_SIZE) {
+            sizeClass = 'size-warning';
+            sizeIcon = '⚡';
+            sizeTooltip = ' (大きなファイル)';
+        }
+
         item.innerHTML = `
             <div class="video-info">
                 <span class="video-name">${video.name}</span>
                 <span class="video-path">${video.path}</span>
             </div>
-            <span class="video-size">${sizeStr}</span>
+            <span class="video-size ${sizeClass}" title="${sizeStr}${sizeTooltip}">${sizeIcon} ${sizeStr}</span>
         `;
 
         elements.videoList.appendChild(item);
     });
+
+    // Disable add to queue button if there are oversized files
+    if (elements.addToQueueBtn) {
+        if (hasOversizedFiles) {
+            elements.addToQueueBtn.disabled = true;
+            elements.addToQueueBtn.title = '5GBを超えるファイルがあります';
+        } else {
+            elements.addToQueueBtn.disabled = false;
+            elements.addToQueueBtn.title = '';
+        }
+    }
 }
 
 function formatBytes(bytes) {

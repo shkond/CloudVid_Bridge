@@ -131,6 +131,28 @@ class QueueWorker:
                 )
                 return
 
+            # Pre-upload check: validate file size from Drive metadata
+            from app.drive.service import DriveService
+            drive_service = DriveService(credentials)
+            file_info = drive_service.get_file_metadata(job.drive_file_id)
+            file_size = int(file_info.get("size", 0))
+
+            settings = get_settings()
+            if file_size > settings.max_file_size:
+                size_gb = file_size / (1024 ** 3)
+                max_gb = settings.max_file_size / (1024 ** 3)
+                error_msg = f"File too large ({size_gb:.2f}GB > {max_gb:.0f}GB max)"
+                async with get_db_context() as db:
+                    await QueueManagerDB.update_job(
+                        db,
+                        job_id,
+                        status=JobStatus.FAILED,
+                        message=error_msg,
+                        error=error_msg,
+                    )
+                logger.error("Job %s failed: %s", job.id, error_msg)
+                return
+
             # Update status to downloading
             async with get_db_context() as db:
                 await QueueManagerDB.update_job(
@@ -157,8 +179,8 @@ class QueueWorker:
                         message=progress.message,
                     )
 
-            # Upload from Drive to YouTube with retry logic
-            result = youtube_service.upload_from_drive_with_retry(
+            # Upload from Drive to YouTube with retry logic (using async version)
+            result = await youtube_service.upload_from_drive_with_retry_async(
                 drive_file_id=job.drive_file_id,
                 metadata=job.metadata,
                 progress_callback=progress_callback,

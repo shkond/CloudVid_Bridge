@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import check_app_auth, get_current_user_from_session
+from app.config import get_settings
 from app.database import get_db
 from app.queue.manager_db import QueueManagerDB
 from app.queue.schemas import (
@@ -20,6 +21,39 @@ from app.queue.schemas import (
 from app.queue.worker import get_queue_worker
 
 router = APIRouter(prefix="/queue", tags=["upload-queue"])
+
+
+def validate_file_size(file_size: int | None, file_name: str = "") -> tuple[bool, str]:
+    """Validate file size against configured limits.
+
+    Args:
+        file_size: File size in bytes (None if unknown)
+        file_name: Optional file name for error messages
+
+    Returns:
+        Tuple of (is_valid, warning_message)
+        - is_valid: False if file exceeds max size
+        - warning_message: Warning message if file exceeds warning size
+    """
+    if file_size is None:
+        return True, ""
+
+    settings = get_settings()
+
+    if file_size > settings.max_file_size:
+        size_gb = file_size / (1024 ** 3)
+        max_gb = settings.max_file_size / (1024 ** 3)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File size ({size_gb:.2f}GB) exceeds maximum allowed ({max_gb:.0f}GB)"
+                   + (f": {file_name}" if file_name else ""),
+        )
+
+    if file_size > settings.warning_file_size:
+        size_gb = file_size / (1024 ** 3)
+        return True, f"Warning: Large file ({size_gb:.2f}GB)"
+
+    return True, ""
 
 
 async def get_current_user_id(
@@ -101,7 +135,13 @@ async def add_job(
 
     Returns:
         Created job
+
+    Raises:
+        HTTPException: If file size exceeds maximum limit
     """
+    # Validate file size
+    _, warning = validate_file_size(job_create.file_size, job_create.drive_file_name)
+
     job = await QueueManagerDB.add_job(db, job_create, user_id)
 
     # Ensure worker is running
@@ -109,7 +149,8 @@ async def add_job(
     if not worker.is_running():
         background_tasks.add_task(_start_worker)
 
-    return QueueJobResponse(job=job, message="Job added to queue")
+    message = warning if warning else "Job added to queue"
+    return QueueJobResponse(job=job, message=message)
 
 
 @router.post("/jobs/bulk", response_model=BulkQueueResponse)
@@ -129,7 +170,17 @@ async def add_bulk_jobs(
 
     Returns:
         Bulk operation response
+
+    Raises:
+        HTTPException: If any file size exceeds maximum limit
     """
+    # Validate all file sizes first
+    warnings = []
+    for file_job in request.files:
+        _, warning = validate_file_size(file_job.file_size, file_job.drive_file_name)
+        if warning:
+            warnings.append(warning)
+
     jobs = []
     for file_job in request.files:
         job = await QueueManagerDB.add_job(db, file_job, user_id)
@@ -140,10 +191,14 @@ async def add_bulk_jobs(
     if not worker.is_running():
         background_tasks.add_task(_start_worker)
 
+    message = f"Added {len(jobs)} job(s) to queue"
+    if warnings:
+        message += f" ({len(warnings)} large file warning(s))"
+
     return BulkQueueResponse(
         added_count=len(jobs),
         jobs=jobs,
-        message=f"Added {len(jobs)} job(s) to queue",
+        message=message,
     )
 
 

@@ -186,6 +186,25 @@ class DriveService:
         downloader = MediaIoBaseDownload(buffer, request)
         return buffer, downloader
 
+    def download_to_file(
+        self, file_id: str, file_handle: io.IOBase
+    ) -> MediaIoBaseDownload:
+        """Download a file to a file handle (e.g., temp file).
+
+        This is more memory-efficient than get_file_content_stream for large files
+        as it writes directly to disk instead of holding the entire file in memory.
+
+        Args:
+            file_id: Drive file ID
+            file_handle: Writable file handle (e.g., open temp file in 'wb' mode)
+
+        Returns:
+            MediaIoBaseDownload instance for chunked downloading
+        """
+        request = self.service.files().get_media(fileId=file_id)
+        downloader = MediaIoBaseDownload(file_handle, request)
+        return downloader
+
     def get_file_metadata(self, file_id: str) -> dict[str, Any]:
         """Get file metadata including MD5 checksum.
 
