@@ -122,7 +122,9 @@ class TestWorkerProcessSeparation:
         assert worker.is_running() is False
         assert worker._task is not None  # Task should exist but be cancelled
 
-    @pytest.mark.skip(reason="Obsolete - QueueManager replaced with database-backed QueueManagerDB")
+    @pytest.mark.skip(
+        reason="Obsolete - QueueManager replaced with database-backed QueueManagerDB"
+    )
     @pytest.mark.asyncio
     async def test_worker_handles_no_pending_jobs(self):
         """Test worker handles case when no pending jobs exist."""
@@ -138,7 +140,7 @@ class TestWorkerProcessSeparation:
         mock_manager.get_next_pending_job.return_value = None
         mock_manager.set_processing = MagicMock()
 
-        with patch('app.queue.worker.get_queue_manager', return_value=mock_manager):
+        with patch("app.queue.worker.get_queue_manager", return_value=mock_manager):
             await worker.start()
             await asyncio.sleep(0.2)  # Let it run a little
             await worker.stop()
@@ -190,9 +192,9 @@ class TestWorkerIntegration:
         # Simulate worker processing (without actual YouTube upload)
         async with session_maker() as session:
             result = await session.execute(
-                select(QueueJobModel).where(
-                    QueueJobModel.status == "pending"
-                ).order_by(QueueJobModel.created_at.asc())
+                select(QueueJobModel)
+                .where(QueueJobModel.status == "pending")
+                .order_by(QueueJobModel.created_at.asc())
             )
             pending_job = result.scalars().first()
 
@@ -258,9 +260,9 @@ class TestWorkerIntegration:
         async with session_maker() as session:
             for expected_id in job_ids:
                 result = await session.execute(
-                    select(QueueJobModel).where(
-                        QueueJobModel.status == "pending"
-                    ).order_by(QueueJobModel.created_at.asc())
+                    select(QueueJobModel)
+                    .where(QueueJobModel.status == "pending")
+                    .order_by(QueueJobModel.created_at.asc())
                 )
                 job = result.scalars().first()
 

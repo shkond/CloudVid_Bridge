@@ -48,11 +48,16 @@ class TestSettingsSwitch:
     def test_env_var_priority_over_default(clear_settings_cache):
         """Test environment variables take priority over defaults."""
         # Default database_url is sqlite
-        with patch.dict(os.environ, {
-            "DATABASE_URL": "postgresql://override:pass@host:5432/overridedb"
-        }, clear=False):
+        with patch.dict(
+            os.environ,
+            {"DATABASE_URL": "postgresql://override:pass@host:5432/overridedb"},
+            clear=False,
+        ):
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
-            assert settings.database_url == "postgresql://override:pass@host:5432/overridedb"
+            assert (
+                settings.database_url
+                == "postgresql://override:pass@host:5432/overridedb"
+            )
 
     @staticmethod
     def test_env_var_priority_for_app_env(clear_settings_cache):
@@ -99,24 +104,36 @@ class TestSettingsSwitch:
     @staticmethod
     def test_google_oauth_settings(clear_settings_cache):
         """Test Google OAuth settings from environment."""
-        with patch.dict(os.environ, {
-            "GOOGLE_CLIENT_ID": "test-client-id.apps.googleusercontent.com",
-            "GOOGLE_CLIENT_SECRET": "test-client-secret",
-            "GOOGLE_REDIRECT_URI": "https://app.example.com/auth/callback",
-        }, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                "GOOGLE_CLIENT_ID": "test-client-id.apps.googleusercontent.com",
+                "GOOGLE_CLIENT_SECRET": "test-client-secret",
+                "GOOGLE_REDIRECT_URI": "https://app.example.com/auth/callback",
+            },
+            clear=False,
+        ):
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
-            assert settings.google_client_id == "test-client-id.apps.googleusercontent.com"
+            assert (
+                settings.google_client_id == "test-client-id.apps.googleusercontent.com"
+            )
             assert settings.google_client_secret == "test-client-secret"
-            assert settings.google_redirect_uri == "https://app.example.com/auth/callback"
+            assert (
+                settings.google_redirect_uri == "https://app.example.com/auth/callback"
+            )
 
     @staticmethod
     def test_queue_settings(clear_settings_cache):
         """Test queue-related settings."""
-        with patch.dict(os.environ, {
-            "MAX_CONCURRENT_UPLOADS": "5",
-            "UPLOAD_CHUNK_SIZE": "20971520",  # 20MB
-        }, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                "MAX_CONCURRENT_UPLOADS": "5",
+                "UPLOAD_CHUNK_SIZE": "20971520",  # 20MB
+            },
+            clear=False,
+        ):
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
             assert settings.max_concurrent_uploads == 5
@@ -154,13 +171,17 @@ class TestSettingsSwitch:
         """Test DigitalOcean production configuration."""
         do_db_url = "postgresql://user:pass@db-postgresql-sgp1-12345.ondigitalocean.com:25060/defaultdb"
 
-        with patch.dict(os.environ, {
-            "APP_ENV": "production",
-            "DEBUG": "false",
-            "DATABASE_URL": do_db_url,
-            "SECRET_KEY": "production-secret-key-32-chars!!",
-            "PORT": "8080",
-        }, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                "APP_ENV": "production",
+                "DEBUG": "false",
+                "DATABASE_URL": do_db_url,
+                "SECRET_KEY": "production-secret-key-32-chars!!",
+                "PORT": "8080",
+            },
+            clear=False,
+        ):
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
             assert settings.is_production is True
@@ -174,10 +195,14 @@ class TestSettingsSwitch:
     @staticmethod
     def test_auth_settings(clear_settings_cache):
         """Test simple authentication settings."""
-        with patch.dict(os.environ, {
-            "AUTH_USERNAME": "admin",
-            "AUTH_PASSWORD": "secure-password-123",
-        }, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                "AUTH_USERNAME": "admin",
+                "AUTH_PASSWORD": "secure-password-123",
+            },
+            clear=False,
+        ):
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
             assert settings.auth_username == "admin"
@@ -187,9 +212,13 @@ class TestSettingsSwitch:
     def test_case_insensitive_env_vars(clear_settings_cache):
         """Test environment variable names are case insensitive."""
         # pydantic-settings should handle case insensitivity
-        with patch.dict(os.environ, {
-            "app_env": "test",  # lowercase
-        }, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                "app_env": "test",  # lowercase
+            },
+            clear=False,
+        ):
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
             # Note: Pydantic Settings with case_sensitive=False should work
             # The actual behavior depends on the OS (Windows is case-insensitive)
@@ -197,9 +226,13 @@ class TestSettingsSwitch:
     @staticmethod
     def test_empty_string_env_var(clear_settings_cache):
         """Test empty string environment variable handling."""
-        with patch.dict(os.environ, {
-            "GOOGLE_CLIENT_ID": "",
-        }, clear=False):
+        with patch.dict(
+            os.environ,
+            {
+                "GOOGLE_CLIENT_ID": "",
+            },
+            clear=False,
+        ):
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
             assert settings.google_client_id == ""
 

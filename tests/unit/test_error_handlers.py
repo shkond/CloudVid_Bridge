@@ -138,6 +138,7 @@ class TestWorkerQuotaHandling:
 
             # Verify the mock returns expected values
             from app.youtube.quota import get_quota_tracker
+
             tracker = get_quota_tracker()
             assert tracker.can_perform("videos.insert")
 
@@ -152,6 +153,7 @@ class TestWorkerQuotaHandling:
 
             # Verify the mock returns expected values
             from app.youtube.quota import get_quota_tracker
+
             tracker = get_quota_tracker()
             assert not tracker.can_perform("videos.insert")
 

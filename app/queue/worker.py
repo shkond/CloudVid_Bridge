@@ -128,21 +128,20 @@ class QueueWorker:
                         video_id=skip_result.get("video_id"),
                         video_url=skip_result.get("video_url"),
                     )
-                logger.info(
-                    "Job %s skipped: %s", job.id, skip_result["reason"]
-                )
+                logger.info("Job %s skipped: %s", job.id, skip_result["reason"])
                 return
 
             # Pre-upload check: validate file size from Drive metadata
             from app.drive.service import DriveService
+
             drive_service = DriveService(credentials)
             file_info = await drive_service.get_file_metadata(job.drive_file_id)
             file_size = int(file_info.get("size", 0))
 
             settings = get_settings()
             if file_size > settings.max_file_size:
-                size_gb = file_size / (1024 ** 3)
-                max_gb = settings.max_file_size / (1024 ** 3)
+                size_gb = file_size / (1024**3)
+                max_gb = settings.max_file_size / (1024**3)
                 error_msg = f"File too large ({size_gb:.2f}GB > {max_gb:.0f}GB max)"
                 async with get_db_context() as db:
                     await QueueManagerDB.update_job(
@@ -200,7 +199,9 @@ class QueueWorker:
                         video_id=result.video_id,
                         video_url=result.video_url,
                     )
-                    logger.info("Job %s completed: video_id=%s", job.id, result.video_id)
+                    logger.info(
+                        "Job %s completed: video_id=%s", job.id, result.video_id
+                    )
 
                     # Save upload history to database
                     await self._save_upload_history(
@@ -300,7 +301,6 @@ class QueueWorker:
 
         return {"skip": False}
 
-
     def is_running(self) -> bool:
         """Check if the worker is running.
 
@@ -348,7 +348,6 @@ class QueueWorker:
             logger.exception("Failed to save upload history for job %s", job.id)
 
 
-
 # Singleton instance
 _queue_worker: QueueWorker | None = None
 
@@ -367,7 +366,7 @@ def get_queue_worker() -> QueueWorker:
 
 async def run_standalone_worker() -> None:
     """Run the worker as a standalone process.
-    
+
     This is the entry point when running the worker separately from the web process.
     Handles graceful shutdown on SIGINT and SIGTERM.
     """
@@ -431,4 +430,3 @@ if __name__ == "__main__":
     Usage: python -m app.queue.worker
     """
     asyncio.run(run_standalone_worker())
-

@@ -54,7 +54,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Database connections closed")
 
 
-
 def create_app() -> FastAPI:
     """Create and configure FastAPI application.
 

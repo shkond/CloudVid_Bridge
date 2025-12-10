@@ -78,10 +78,12 @@ class FolderUploadSettings(BaseModel):
         ),
     )
     include_md5_hash: bool = Field(
-        default=True, description="Include MD5 hash in description for duplicate detection"
+        default=True,
+        description="Include MD5 hash in description for duplicate detection",
     )
     default_privacy: str = Field(
-        default="private", description="Default privacy status (public, private, unlisted)"
+        default="private",
+        description="Default privacy status (public, private, unlisted)",
     )
     default_category_id: str = Field(
         default="24", description="YouTube category ID (24=Entertainment)"
@@ -98,9 +100,7 @@ class FolderUploadRequest(BaseModel):
     """Request to upload all videos from a Drive folder."""
 
     folder_id: str = Field(..., description="Google Drive folder ID")
-    recursive: bool = Field(
-        default=False, description="Whether to include subfolders"
-    )
+    recursive: bool = Field(default=False, description="Whether to include subfolders")
     max_files: int = Field(
         default=100, ge=1, le=500, description="Maximum number of files to upload"
     )
@@ -134,4 +134,3 @@ class FolderUploadResponse(BaseModel):
 
 # Update forward references
 DriveFolder.model_rebuild()
-

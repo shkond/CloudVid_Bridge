@@ -31,7 +31,7 @@ VIDEO_MIME_TYPES = {
 
 class DriveService:
     """Service for interacting with Google Drive API.
-    
+
     All public methods are async to avoid blocking the event loop.
     Uses AnyIO's run_sync to execute blocking Google API calls in a thread pool.
     """
@@ -46,13 +46,13 @@ class DriveService:
 
     async def _execute_async(self, request: Any, cancellable: bool = True) -> Any:
         """Execute a Google API request asynchronously.
-        
+
         Wraps the blocking execute() call in run_sync to avoid blocking the event loop.
-        
+
         Args:
             request: Google API request object with execute() method
             cancellable: Whether the operation can be cancelled (default: True)
-            
+
         Returns:
             API response
         """
@@ -136,7 +136,9 @@ class DriveService:
         Returns:
             Folder metadata dict
         """
-        request = self.service.files().get(fileId=folder_id, fields="id, name, mimeType")
+        request = self.service.files().get(
+            fileId=folder_id, fields="id, name, mimeType"
+        )
         return await self._execute_async(request)
 
     async def scan_folder(
@@ -191,7 +193,7 @@ class DriveService:
         self, file_id: str
     ) -> tuple[io.BytesIO, MediaIoBaseDownload]:
         """Get a file content stream for downloading.
-        
+
         Note: This method is synchronous as it only creates the downloader.
         The actual download (next_chunk calls) should be run in a thread pool.
 
@@ -213,7 +215,7 @@ class DriveService:
 
         This is more memory-efficient than get_file_content_stream for large files
         as it writes directly to disk instead of holding the entire file in memory.
-        
+
         Note: This method is synchronous as it only creates the downloader.
         The actual download (next_chunk calls) should be run in a thread pool.
 
@@ -268,7 +270,11 @@ class DriveService:
             current_path = folder_path or "My Drive"
         else:
             folder_info = await self.get_folder_info(folder_id)
-            current_path = f"{folder_path}/{folder_info['name']}" if folder_path else folder_info["name"]
+            current_path = (
+                f"{folder_path}/{folder_info['name']}"
+                if folder_path
+                else folder_info["name"]
+            )
 
         # List files in folder
         files = await self.list_files(folder_id, video_only=True)

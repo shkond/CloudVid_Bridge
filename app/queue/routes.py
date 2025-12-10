@@ -41,16 +41,16 @@ def validate_file_size(file_size: int | None, file_name: str = "") -> tuple[bool
     settings = get_settings()
 
     if file_size > settings.max_file_size:
-        size_gb = file_size / (1024 ** 3)
-        max_gb = settings.max_file_size / (1024 ** 3)
+        size_gb = file_size / (1024**3)
+        max_gb = settings.max_file_size / (1024**3)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"File size ({size_gb:.2f}GB) exceeds maximum allowed ({max_gb:.0f}GB)"
-                   + (f": {file_name}" if file_name else ""),
+            + (f": {file_name}" if file_name else ""),
         )
 
     if file_size > settings.warning_file_size:
-        size_gb = file_size / (1024 ** 3)
+        size_gb = file_size / (1024**3)
         return True, f"Warning: Large file ({size_gb:.2f}GB)"
 
     return True, ""

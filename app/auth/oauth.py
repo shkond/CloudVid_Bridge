@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class OAuthService:
     """Service for managing Google OAuth authentication with DB persistence.
-    
+
     Tokens are stored encrypted in the database using Fernet encryption.
     Supports multi-user token storage keyed by user_id.
     """
@@ -29,10 +29,10 @@ class OAuthService:
 
     async def _load_credentials_from_db(self, user_id: str) -> Credentials | None:
         """Load credentials from database for a user.
-        
+
         Args:
             user_id: User identifier
-            
+
         Returns:
             Credentials or None if not found
         """
@@ -71,11 +71,9 @@ class OAuthService:
             return None
 
     @staticmethod
-    async def _save_credentials_to_db(
-        user_id: str, credentials: Credentials
-    ) -> None:
+    async def _save_credentials_to_db(user_id: str, credentials: Credentials) -> None:
         """Save credentials to database for a user.
-        
+
         Args:
             user_id: User identifier
             credentials: Google credentials to save
@@ -104,7 +102,9 @@ class OAuthService:
                     existing.encrypted_access_token = encrypted_access
                     existing.encrypted_refresh_token = encrypted_refresh
                     existing.scopes = scopes_json
-                    existing.token_uri = credentials.token_uri or "https://oauth2.googleapis.com/token"
+                    existing.token_uri = (
+                        credentials.token_uri or "https://oauth2.googleapis.com/token"
+                    )
                     if credentials.expiry:
                         existing.expires_at = credentials.expiry
                 else:
@@ -114,7 +114,8 @@ class OAuthService:
                         encrypted_access_token=encrypted_access,
                         encrypted_refresh_token=encrypted_refresh,
                         scopes=scopes_json,
-                        token_uri=credentials.token_uri or "https://oauth2.googleapis.com/token",
+                        token_uri=credentials.token_uri
+                        or "https://oauth2.googleapis.com/token",
                         expires_at=credentials.expiry,
                     )
                     session.add(token_record)
@@ -128,10 +129,10 @@ class OAuthService:
 
     def get_credentials_sync(self, user_id: str) -> Credentials | None:
         """Get cached credentials synchronously (for non-async contexts).
-        
+
         Args:
             user_id: User identifier
-            
+
         Returns:
             Cached credentials or None
         """
@@ -173,7 +174,7 @@ class OAuthService:
 
     async def is_authenticated(self, user_id: str) -> bool:
         """Check if user is authenticated with valid credentials.
-        
+
         Args:
             user_id: User identifier
         """
@@ -224,7 +225,7 @@ class OAuthService:
 
     async def logout(self, user_id: str) -> None:
         """Clear stored credentials for a user.
-        
+
         Args:
             user_id: User identifier
         """

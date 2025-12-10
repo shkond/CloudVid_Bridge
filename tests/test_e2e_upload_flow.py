@@ -157,7 +157,7 @@ class TestCompleteUploadFlow:
     @pytest.mark.asyncio
     async def test_restart_resilience(self):
         """Test jobs survive simulated restart and resume processing.
-        
+
         Note: This test uses a file-based SQLite database to properly test
         persistence across connection disposal (simulating process restart).
         """
@@ -416,8 +416,8 @@ class TestCompleteUploadFlow:
                 job_id = make_job_id()
                 job_ids.append(job_id)
                 metadata = VideoMetadata(
-                    title=f"Batch Video {i+1}",
-                    description=f"Part {i+1} of batch upload",
+                    title=f"Batch Video {i + 1}",
+                    description=f"Part {i + 1} of batch upload",
                     privacy_status=PrivacyStatus.UNLISTED,
                 )
                 job = QueueJobModel(

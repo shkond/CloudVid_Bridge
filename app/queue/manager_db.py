@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class QueueManagerDB:
     """Database-backed queue manager for persistent storage.
-    
+
     This implementation uses QueueJobModel for database persistence,
     enabling multi-user support and data survival across server restarts.
     """
@@ -27,10 +27,10 @@ class QueueManagerDB:
     @staticmethod
     def _model_to_schema(model: QueueJobModel) -> QueueJob:
         """Convert database model to Pydantic schema.
-        
+
         Args:
             model: QueueJobModel instance
-            
+
         Returns:
             QueueJob schema
         """
@@ -63,12 +63,12 @@ class QueueManagerDB:
         db: AsyncSession, job_create: QueueJobCreate, user_id: str
     ) -> QueueJob:
         """Add a new job to the queue.
-        
+
         Args:
             db: Database session
             job_create: Job creation request
             user_id: User ID who created this job
-            
+
         Returns:
             Created QueueJob
         """
@@ -109,11 +109,11 @@ class QueueManagerDB:
     @staticmethod
     async def get_job(db: AsyncSession, job_id: UUID) -> QueueJob | None:
         """Get a job by ID.
-        
+
         Args:
             db: Database session
             job_id: Job UUID
-            
+
         Returns:
             QueueJob or None if not found
         """
@@ -139,7 +139,7 @@ class QueueManagerDB:
         error: str | None = None,
     ) -> QueueJob | None:
         """Update a job's status and progress.
-        
+
         Args:
             db: Database session
             job_id: Job UUID
@@ -149,7 +149,7 @@ class QueueManagerDB:
             video_id: YouTube video ID (optional)
             video_url: YouTube video URL (optional)
             error: Error message (optional)
-            
+
         Returns:
             Updated QueueJob or None if not found
         """
@@ -189,11 +189,11 @@ class QueueManagerDB:
     @staticmethod
     async def cancel_job(db: AsyncSession, job_id: UUID) -> QueueJob | None:
         """Cancel a pending or downloading job.
-        
+
         Args:
             db: Database session
             job_id: Job UUID
-            
+
         Returns:
             Cancelled QueueJob or None if not found or not cancellable
         """
@@ -221,11 +221,11 @@ class QueueManagerDB:
     @staticmethod
     async def delete_job(db: AsyncSession, job_id: UUID) -> bool:
         """Delete a job from the queue.
-        
+
         Args:
             db: Database session
             job_id: Job UUID
-            
+
         Returns:
             True if deleted, False if not found
         """
@@ -239,10 +239,10 @@ class QueueManagerDB:
     @staticmethod
     async def get_all_jobs(db: AsyncSession) -> list[QueueJob]:
         """Get all jobs in the queue.
-        
+
         Args:
             db: Database session
-            
+
         Returns:
             List of all QueueJobs
         """
@@ -254,11 +254,11 @@ class QueueManagerDB:
     @staticmethod
     async def get_jobs_by_user(db: AsyncSession, user_id: str) -> list[QueueJob]:
         """Get all jobs for a specific user.
-        
+
         Args:
             db: Database session
             user_id: User identifier
-            
+
         Returns:
             List of QueueJobs belonging to the user
         """
@@ -272,10 +272,10 @@ class QueueManagerDB:
     @staticmethod
     async def get_pending_jobs(db: AsyncSession) -> list[QueueJob]:
         """Get all pending jobs.
-        
+
         Args:
             db: Database session
-            
+
         Returns:
             List of pending QueueJobs
         """
@@ -291,10 +291,10 @@ class QueueManagerDB:
     @staticmethod
     async def get_next_pending_job(db: AsyncSession) -> QueueJob | None:
         """Get the next pending job in queue order (FIFO).
-        
+
         Args:
             db: Database session
-            
+
         Returns:
             Next pending QueueJob or None
         """
@@ -314,10 +314,10 @@ class QueueManagerDB:
     @staticmethod
     async def get_active_jobs(db: AsyncSession) -> list[QueueJob]:
         """Get all active (downloading/uploading) jobs.
-        
+
         Args:
             db: Database session
-            
+
         Returns:
             List of active QueueJobs
         """
@@ -331,17 +331,15 @@ class QueueManagerDB:
         return [QueueManagerDB._model_to_schema(m) for m in models]
 
     @staticmethod
-    async def get_status(
-        db: AsyncSession, user_id: str | None = None
-    ) -> QueueStatus:
+    async def get_status(db: AsyncSession, user_id: str | None = None) -> QueueStatus:
         """Get overall queue status, optionally filtered by user.
-        
+
         Uses database aggregation for efficiency instead of loading all jobs.
-        
+
         Args:
             db: Database session
             user_id: Optional user ID to filter by
-            
+
         Returns:
             QueueStatus summary
         """
@@ -390,15 +388,13 @@ class QueueManagerDB:
         )
 
     @staticmethod
-    async def clear_completed(
-        db: AsyncSession, user_id: str | None = None
-    ) -> int:
+    async def clear_completed(db: AsyncSession, user_id: str | None = None) -> int:
         """Clear all completed jobs from the queue.
-        
+
         Args:
             db: Database session
             user_id: Optional user ID to filter by
-            
+
         Returns:
             Number of jobs cleared
         """
@@ -423,11 +419,11 @@ class QueueManagerDB:
     @staticmethod
     async def is_file_id_in_queue(db: AsyncSession, drive_file_id: str) -> bool:
         """Check if a file ID is already in the queue (pending or active).
-        
+
         Args:
             db: Database session
             drive_file_id: Google Drive file ID
-            
+
         Returns:
             True if file is already in queue
         """
@@ -452,11 +448,11 @@ class QueueManagerDB:
     @staticmethod
     async def is_md5_in_queue(db: AsyncSession, md5_checksum: str) -> bool:
         """Check if a file with given MD5 is already in the queue.
-        
+
         Args:
             db: Database session
             md5_checksum: MD5 checksum of the file
-            
+
         Returns:
             True if file with same MD5 is in queue
         """
@@ -484,11 +480,11 @@ class QueueManagerDB:
     @staticmethod
     async def get_jobs_by_batch(db: AsyncSession, batch_id: str) -> list[QueueJob]:
         """Get all jobs for a specific batch.
-        
+
         Args:
             db: Database session
             batch_id: Batch ID
-            
+
         Returns:
             List of jobs in the batch
         """

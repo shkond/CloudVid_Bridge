@@ -208,13 +208,7 @@ class TestYouTubeServiceOptimization:
         """Test optimized list uses playlist API."""
         # Mock channel response with uploads playlist
         mock_youtube_service._mock_api.channels().list().execute.return_value = {
-            "items": [
-                {
-                    "contentDetails": {
-                        "relatedPlaylists": {"uploads": "UU123456"}
-                    }
-                }
-            ]
+            "items": [{"contentDetails": {"relatedPlaylists": {"uploads": "UU123456"}}}]
         }
 
         # Mock playlist items response

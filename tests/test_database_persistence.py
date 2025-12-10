@@ -35,7 +35,10 @@ class TestPostgreSQLConnection:
             database_url="postgres://user:pass@host:5432/dbname",
             _env_file=None,  # type: ignore[call-arg]
         )
-        assert settings.async_database_url == "postgresql+asyncpg://user:pass@host:5432/dbname"
+        assert (
+            settings.async_database_url
+            == "postgresql+asyncpg://user:pass@host:5432/dbname"
+        )
 
     @staticmethod
     def test_postgresql_url_conversion_from_postgresql():
@@ -44,7 +47,10 @@ class TestPostgreSQLConnection:
             database_url="postgresql://user:pass@host:5432/dbname",
             _env_file=None,  # type: ignore[call-arg]
         )
-        assert settings.async_database_url == "postgresql+asyncpg://user:pass@host:5432/dbname"
+        assert (
+            settings.async_database_url
+            == "postgresql+asyncpg://user:pass@host:5432/dbname"
+        )
 
     @staticmethod
     def test_digitalocean_postgresql_url():
@@ -69,6 +75,7 @@ class TestPostgreSQLConnection:
     def test_connection_pool_pre_ping():
         """Test that connection pool has pre_ping enabled."""
         import tempfile
+
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             db_path = f.name
         try:
@@ -174,6 +181,7 @@ class TestMigration:
 
         # Verify record was not persisted
         from sqlalchemy import select
+
         result = await test_session.execute(
             select(UploadHistory).where(UploadHistory.drive_file_id == "rollback-test")
         )
@@ -203,6 +211,7 @@ class TestMigration:
 
         # Verify all records
         from sqlalchemy import func, select
+
         result = await test_session.execute(
             select(func.count()).select_from(UploadHistory)
         )

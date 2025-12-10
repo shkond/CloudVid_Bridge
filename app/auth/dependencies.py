@@ -99,16 +99,16 @@ def get_current_user(
     session_data: dict = None,
 ) -> str:
     """Get current user ID from session.
-    
+
     This is a dependency for extracting user_id from authenticated sessions.
     Use with Depends(require_app_auth) to ensure authentication.
-    
+
     Args:
         session_data: Session data from require_app_auth (optional, for chaining)
-        
+
     Returns:
         User ID string
-        
+
     Raises:
         HTTPException: If user_id not found in session
     """
@@ -130,13 +130,13 @@ def get_current_user(
 
 def get_current_user_from_session(session_data: dict) -> str | None:
     """Extract user_id from session data (non-async helper).
-    
+
     Args:
         session_data: Session data dict
-        
+
     Returns:
         User ID string or None if not found
-        
+
     Note:
         Returns None instead of a default value to avoid hiding authentication bugs.
         Callers should handle None appropriately.

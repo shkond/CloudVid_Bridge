@@ -1,10 +1,12 @@
 """Google Drive routes."""
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import check_app_auth, get_current_user_from_session
-from app.auth.oauth import get_oauth_service
+from app.core.dependencies import (
+    get_drive_service,
+    get_user_id_from_session,
+)
 from app.database import get_db
 from app.drive.schemas import (
     DriveFile,
@@ -14,53 +16,31 @@ from app.drive.schemas import (
     FolderUploadResponse,
     SkippedFile,
 )
-from app.drive.service import DriveService
-
-# Note: DriveService is instantiated per-request with user-specific credentials
-from app.queue.manager_db import QueueManagerDB
+from app.drive.services import DriveService
+from app.queue.repositories import QueueRepository
 from app.queue.schemas import QueueJob
 
 router = APIRouter(prefix="/drive", tags=["google-drive"])
-
 
 
 @router.get("/files", response_model=list[DriveFile])
 async def list_files(
     folder_id: str = Query(default="root", description="Drive folder ID"),
     video_only: bool = Query(default=True, description="Filter to video files only"),
-    session_token: str | None = Cookie(None, alias="session"),
+    service: DriveService = Depends(get_drive_service),
 ) -> list[DriveFile]:
     """List files in a Drive folder.
 
     Args:
         folder_id: Google Drive folder ID (default: root)
         video_only: Whether to filter to video files only
+        service: DriveService (injected via DI)
 
     Returns:
         List of files in the folder
     """
     try:
-        # Validate session and get user_id
-        session_data = check_app_auth(session_token)
-        if not session_data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
-        user_id = get_current_user_from_session(session_data)
-
-        oauth_service = get_oauth_service()
-        credentials = await oauth_service.get_credentials(user_id)
-        if not credentials:
-            raise ValueError("Not authenticated with Google")
-
-        service = DriveService(credentials)
         return await service.list_files(folder_id, video_only)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -71,31 +51,18 @@ async def list_files(
 @router.post("/scan", response_model=FolderScanResponse)
 async def scan_folder(
     request: FolderScanRequest,
-    session_token: str | None = Cookie(None, alias="session"),
+    service: DriveService = Depends(get_drive_service),
 ) -> FolderScanResponse:
     """Scan a Drive folder for video files.
 
     Args:
         request: Folder scan request with options
+        service: DriveService (injected via DI)
 
     Returns:
         FolderScanResponse with folder contents
     """
     try:
-        session_data = check_app_auth(session_token)
-        if not session_data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
-        user_id = get_current_user_from_session(session_data)
-
-        oauth_service = get_oauth_service()
-        credentials = await oauth_service.get_credentials(user_id)
-        if not credentials:
-            raise ValueError("Not authenticated with Google")
-
-        service = DriveService(credentials)
         folder = await service.scan_folder(
             folder_id=request.folder_id,
             recursive=request.recursive,
@@ -105,11 +72,6 @@ async def scan_folder(
             folder=folder,
             message=f"Found {folder.total_videos} video(s) in folder",
         )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -118,36 +80,21 @@ async def scan_folder(
 
 
 @router.get("/file/{file_id}")
-async def get_file_info(file_id: str, session_token: str | None = Cookie(None, alias="session")) -> dict:
+async def get_file_info(
+    file_id: str,
+    service: DriveService = Depends(get_drive_service),
+) -> dict:
     """Get information about a specific file.
 
     Args:
         file_id: Google Drive file ID
+        service: DriveService (injected via DI)
 
     Returns:
         File metadata
     """
     try:
-        session_data = check_app_auth(session_token)
-        if not session_data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
-        user_id = get_current_user_from_session(session_data)
-
-        oauth_service = get_oauth_service()
-        credentials = await oauth_service.get_credentials(user_id)
-        if not credentials:
-            raise ValueError("Not authenticated with Google")
-
-        service = DriveService(credentials)
         return await service.get_file_metadata(file_id)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -158,8 +105,9 @@ async def get_file_info(file_id: str, session_token: str | None = Cookie(None, a
 @router.post("/folder/upload", response_model=FolderUploadResponse)
 async def upload_folder(
     request: FolderUploadRequest,
+    service: DriveService = Depends(get_drive_service),
+    user_id: str = Depends(get_user_id_from_session),
     db: AsyncSession = Depends(get_db),
-    session_token: str | None = Cookie(None, alias="session"),
 ) -> FolderUploadResponse:
     """Upload all videos from a Drive folder to YouTube.
 
@@ -168,6 +116,8 @@ async def upload_folder(
 
     Args:
         request: Folder upload request with settings
+        service: DriveService (injected via DI)
+        user_id: Current user ID (injected via DI)
         db: Database session
 
     Returns:
@@ -183,33 +133,20 @@ async def upload_folder(
     from app.youtube.schemas import PrivacyStatus, VideoMetadata
 
     try:
-        # Get user ID from session
-        session_data = check_app_auth(session_token)
-        if not session_data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
-        user_id = get_current_user_from_session(session_data)
-
-        oauth_service = get_oauth_service()
-        credentials = await oauth_service.get_credentials(user_id)
-        if not credentials:
-            raise ValueError("Not authenticated with Google")
-        drive_service = DriveService(credentials)
+        queue_repo = QueueRepository(db)
 
         # Get folder info
         if request.folder_id == "root":
             folder_name = "My Drive"
         else:
-            folder_info = await drive_service.get_folder_info(request.folder_id)
+            folder_info = await service.get_folder_info(request.folder_id)
             folder_name = folder_info["name"]
 
         # Generate batch ID
         batch_id = str(uuid.uuid4())
 
         # Get all videos in folder
-        video_files = await drive_service.get_all_videos_flat(
+        video_files = await service.get_all_videos_flat(
             folder_id=request.folder_id,
             recursive=request.recursive,
             max_files=request.max_files,
@@ -226,20 +163,24 @@ async def upload_folder(
             # Check for duplicates
             if request.skip_duplicates:
                 # Check if already in queue
-                if await QueueManagerDB.is_file_id_in_queue(db, file_id):
-                    skipped_files.append(SkippedFile(
-                        file_id=file_id,
-                        file_name=file_name,
-                        reason="already_in_queue",
-                    ))
+                if await queue_repo.is_file_id_in_queue(file_id):
+                    skipped_files.append(
+                        SkippedFile(
+                            file_id=file_id,
+                            file_name=file_name,
+                            reason="already_in_queue",
+                        )
+                    )
                     continue
 
-                if md5_checksum and await QueueManagerDB.is_md5_in_queue(db, md5_checksum):
-                    skipped_files.append(SkippedFile(
-                        file_id=file_id,
-                        file_name=file_name,
-                        reason="duplicate_md5_in_queue",
-                    ))
+                if md5_checksum and await queue_repo.is_md5_in_queue(md5_checksum):
+                    skipped_files.append(
+                        SkippedFile(
+                            file_id=file_id,
+                            file_name=file_name,
+                            reason="duplicate_md5_in_queue",
+                        )
+                    )
                     continue
 
                 # Check if already uploaded (in database)
@@ -251,11 +192,13 @@ async def upload_folder(
                     )
                     existing = result.scalar_one_or_none()
                     if existing:
-                        skipped_files.append(SkippedFile(
-                            file_id=file_id,
-                            file_name=file_name,
-                            reason=f"already_uploaded:{existing.youtube_video_id}",
-                        ))
+                        skipped_files.append(
+                            SkippedFile(
+                                file_id=file_id,
+                                file_name=file_name,
+                                reason=f"already_uploaded:{existing.youtube_video_id}",
+                            )
+                        )
                         continue
 
             # Generate video metadata from template
@@ -311,7 +254,7 @@ async def upload_folder(
                 metadata=video_metadata,
             )
 
-            job = await QueueManagerDB.add_job(db, job_create, user_id)
+            job = await queue_repo.add_job(job_create, user_id)
             added_jobs.append(job)
 
         return FolderUploadResponse(
@@ -323,15 +266,8 @@ async def upload_folder(
             message=f"Added {len(added_jobs)} video(s) to queue, skipped {len(skipped_files)}",
         )
 
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload folder: {e!s}",
         ) from e
-
-

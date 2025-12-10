@@ -407,7 +407,7 @@ class TestQueueOperations:
         result = await test_session.execute(
             select(QueueJobModel).where(
                 QueueJobModel.drive_md5_checksum == md5,
-                QueueJobModel.status.in_(["pending", "downloading", "uploading"])
+                QueueJobModel.status.in_(["pending", "downloading", "uploading"]),
             )
         )
         existing = result.scalars().first()

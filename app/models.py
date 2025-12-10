@@ -53,7 +53,7 @@ class UploadHistory(Base):
 
 class QueueJobModel(Base):
     """Persistent queue job for upload queue.
-    
+
     This model stores upload jobs in the database for persistence
     across server restarts and for communication between web and worker processes.
     """
@@ -71,10 +71,14 @@ class QueueJobModel(Base):
     )  # User who created this job
     drive_file_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     drive_file_name: Mapped[str] = mapped_column(String(500), nullable=False)
-    drive_md5_checksum: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    drive_md5_checksum: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, index=True
+    )
     folder_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     batch_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
-    metadata_json: Mapped[str] = mapped_column(Text, nullable=False)  # VideoMetadata as JSON
+    metadata_json: Mapped[str] = mapped_column(
+        Text, nullable=False
+    )  # VideoMetadata as JSON
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pending", index=True
     )  # pending, downloading, uploading, completed, failed, cancelled
@@ -110,7 +114,7 @@ class QueueJobModel(Base):
 
 class OAuthToken(Base):
     """Encrypted OAuth token storage.
-    
+
     Stores OAuth credentials with encryption for security.
     Tokens are encrypted using Fernet symmetric encryption.
     """
@@ -126,7 +130,9 @@ class OAuthToken(Base):
     token_uri: Mapped[str] = mapped_column(
         String(255), nullable=False, default="https://oauth2.googleapis.com/token"
     )
-    scopes: Mapped[str] = mapped_column(Text, nullable=False, default="[]")  # JSON array
+    scopes: Mapped[str] = mapped_column(
+        Text, nullable=False, default="[]"
+    )  # JSON array
     expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
@@ -146,4 +152,3 @@ class OAuthToken(Base):
     def __repr__(self) -> str:
         """Return string representation."""
         return f"<OAuthToken(id={self.id}, user_id={self.user_id})>"
-

@@ -77,6 +77,7 @@ class TestTokenEncryption:
         # Note: Fernet encryption includes random IV, so same plaintext
         # produces different ciphertext. But both should decrypt correctly.
         from app.crypto import decrypt_token
+
         assert decrypt_token(encrypted1) == token
         assert decrypt_token(encrypted2) == token
 
@@ -201,8 +202,14 @@ class TestTokenEncryption:
             token = result.scalars().first()
 
             assert token is not None
-            assert decrypt_token(token.encrypted_access_token) == f"access_token_{user_num}"
-            assert decrypt_token(token.encrypted_refresh_token) == f"refresh_token_{user_num}"
+            assert (
+                decrypt_token(token.encrypted_access_token)
+                == f"access_token_{user_num}"
+            )
+            assert (
+                decrypt_token(token.encrypted_refresh_token)
+                == f"refresh_token_{user_num}"
+            )
 
 
 class TestOAuthServiceWithDB:

@@ -14,9 +14,9 @@ from cryptography.fernet import Fernet
 @lru_cache(maxsize=1)
 def _get_fernet() -> Fernet:
     """Get or create Fernet instance with derived key.
-    
+
     Uses SECRET_KEY from settings, hashed to 32 bytes for Fernet.
-    
+
     Returns:
         Fernet instance for encryption/decryption
     """
@@ -35,10 +35,10 @@ def _get_fernet() -> Fernet:
 
 def encrypt_token(plaintext: str) -> str:
     """Encrypt a token string.
-    
+
     Args:
         plaintext: The token to encrypt
-        
+
     Returns:
         Base64-encoded encrypted token
     """
@@ -49,13 +49,13 @@ def encrypt_token(plaintext: str) -> str:
 
 def decrypt_token(ciphertext: str) -> str:
     """Decrypt an encrypted token string.
-    
+
     Args:
         ciphertext: Base64-encoded encrypted token
-        
+
     Returns:
         Decrypted plaintext token
-        
+
     Raises:
         cryptography.fernet.InvalidToken: If decryption fails
     """
@@ -66,7 +66,7 @@ def decrypt_token(ciphertext: str) -> str:
 
 def clear_fernet_cache() -> None:
     """Clear the cached Fernet instance.
-    
+
     Useful for testing with different keys.
     """
     _get_fernet.cache_clear()

@@ -125,8 +125,10 @@ def sample_queue_job_data(sample_video_metadata) -> dict[str, Any]:
 @pytest.fixture
 def env_override():
     """Context manager for overriding environment variables."""
+
     def _override(**kwargs):
         return patch.dict(os.environ, kwargs, clear=False)
+
     return _override
 
 
@@ -134,6 +136,7 @@ def env_override():
 def clear_settings_cache():
     """Clear the settings cache before and after test."""
     from app.config import get_settings
+
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -147,7 +150,7 @@ def clear_settings_cache():
 @pytest.fixture
 def mock_google_credentials():
     """Create mock Google OAuth credentials.
-    
+
     Returns a MagicMock that simulates google.oauth2.credentials.Credentials
     with common attributes pre-configured for testing.
     """
@@ -167,7 +170,7 @@ def mock_google_credentials():
 @pytest.fixture
 def mock_drive_service(mock_google_credentials):
     """Create mock Google Drive service.
-    
+
     Patches DriveService and returns a mock that can be configured
     to return specific values for testing Drive operations.
     """
@@ -192,7 +195,7 @@ def mock_drive_service(mock_google_credentials):
 @pytest.fixture
 def mock_youtube_service(mock_google_credentials):
     """Create mock YouTube service.
-    
+
     Patches YouTubeService and returns a mock that can be configured
     to return specific values for testing YouTube operations.
     """
@@ -210,13 +213,16 @@ def mock_youtube_service(mock_google_credentials):
 
         # Mock successful upload result
         from app.youtube.schemas import UploadResult
+
         service.upload_from_drive.return_value = UploadResult(
             success=True,
             video_id="test-video-id",
             video_url="https://www.youtube.com/watch?v=test-video-id",
             message="Upload completed successfully",
         )
-        service.upload_from_drive_with_retry.return_value = service.upload_from_drive.return_value
+        service.upload_from_drive_with_retry.return_value = (
+            service.upload_from_drive.return_value
+        )
 
         mock_class.return_value = service
         yield service
@@ -225,7 +231,7 @@ def mock_youtube_service(mock_google_credentials):
 @pytest.fixture
 def mock_quota_tracker():
     """Create mock quota tracker.
-    
+
     Returns a mock QuotaTracker with configurable quota limits and usage.
     """
     with patch("app.youtube.quota.get_quota_tracker") as mock_getter:
@@ -248,7 +254,7 @@ def mock_quota_tracker():
 @pytest_asyncio.fixture
 async def async_http_client():
     """Create async HTTP test client.
-    
+
     Provides an httpx AsyncClient configured for the FastAPI app,
     suitable for testing async endpoints.
     """
@@ -264,10 +270,10 @@ async def async_http_client():
 @pytest.fixture
 def test_video_file(tmp_path):
     """Create a test video file.
-    
+
     Creates a minimal mock video file in a temporary directory
     for testing file operations without requiring actual video content.
-    
+
     Returns:
         Path to the temporary test video file
     """
@@ -275,4 +281,3 @@ def test_video_file(tmp_path):
     # Create a minimal "video" file (not actually valid video data)
     video_path.write_bytes(b"\x00" * 1024)  # 1KB dummy file
     return video_path
-

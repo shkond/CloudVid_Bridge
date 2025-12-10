@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class QuotaTracker:
     """Track YouTube API quota usage.
-    
+
     YouTube Data API has a daily quota limit (default 10,000 units).
     Different operations have different costs:
     - videos.insert: 1600 units
@@ -40,14 +40,12 @@ class QuotaTracker:
 
     def __init__(self, daily_limit: int = DEFAULT_DAILY_LIMIT) -> None:
         """Initialize quota tracker.
-        
+
         Args:
             daily_limit: Daily quota limit (default 10,000)
         """
         self._daily_limit = daily_limit
-        self._usage: dict[str, dict[str, int]] = defaultdict(
-            lambda: defaultdict(int)
-        )
+        self._usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         self._lock = Lock()
         self._reset_date: str | None = None
         self._daily_total: int = 0  # Cached daily total
@@ -74,11 +72,11 @@ class QuotaTracker:
 
     def track(self, operation: str, count: int = 1) -> int:
         """Track an API operation.
-        
+
         Args:
             operation: API operation name (e.g., "videos.list")
             count: Number of times the operation was called
-            
+
         Returns:
             Cost in quota units
         """
@@ -103,7 +101,7 @@ class QuotaTracker:
 
     def get_daily_usage(self) -> int:
         """Get today's total quota usage.
-        
+
         Returns:
             Total units used today
         """
@@ -113,7 +111,7 @@ class QuotaTracker:
 
     def get_remaining_quota(self) -> int:
         """Get remaining quota for today.
-        
+
         Returns:
             Estimated remaining units
         """
@@ -121,7 +119,7 @@ class QuotaTracker:
 
     def get_usage_summary(self) -> dict:
         """Get detailed usage summary.
-        
+
         Returns:
             Dict with usage breakdown
         """
@@ -152,11 +150,11 @@ class QuotaTracker:
 
     def can_perform(self, operation: str, count: int = 1) -> bool:
         """Check if an operation can be performed within quota.
-        
+
         Args:
             operation: API operation name
             count: Number of times to perform
-            
+
         Returns:
             True if sufficient quota remains
         """
@@ -171,7 +169,7 @@ _quota_tracker_lock = Lock()  # Lock for thread-safe singleton initialization
 
 def get_quota_tracker() -> QuotaTracker:
     """Get or create quota tracker singleton.
-    
+
     Returns:
         QuotaTracker instance
     """

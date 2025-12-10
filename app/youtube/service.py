@@ -44,10 +44,10 @@ logger = logging.getLogger(__name__)
 
 def _is_retryable_error(exception: BaseException) -> bool:
     """Check if an error is retryable (quota/rate limit).
-    
+
     Args:
         exception: The exception to check
-        
+
     Returns:
         True if the error should trigger a retry
     """
@@ -62,11 +62,22 @@ def _is_retryable_error(exception: BaseException) -> bool:
                     .get("errors", [{}])[0]
                     .get("reason", "")
                 )
-            except (json.JSONDecodeError, KeyError, IndexError, UnicodeDecodeError) as e:
-                logger.warning("Could not parse HttpError content for retry check: %s", e)
+            except (
+                json.JSONDecodeError,
+                KeyError,
+                IndexError,
+                UnicodeDecodeError,
+            ) as e:
+                logger.warning(
+                    "Could not parse HttpError content for retry check: %s", e
+                )
 
             # Retry on quota/rate limit errors, but not on permission errors
-            if error_reason in ["quotaExceeded", "rateLimitExceeded", "userRateLimitExceeded"]:
+            if error_reason in [
+                "quotaExceeded",
+                "rateLimitExceeded",
+                "userRateLimitExceeded",
+            ]:
                 logger.warning(
                     "Retryable API error: status=%s, reason=%s",
                     exception.resp.status,
@@ -347,7 +358,9 @@ class YouTubeService:
             try:
                 # Download file from Drive to temp file
                 with os.fdopen(temp_fd, "wb") as temp_file:
-                    downloader = drive_service.download_to_file(drive_file_id, temp_file)
+                    downloader = drive_service.download_to_file(
+                        drive_file_id, temp_file
+                    )
 
                     done = False
                     while not done:
@@ -370,7 +383,9 @@ class YouTubeService:
 
                 logger.info(
                     "Downloaded %s to temp file: %s (%d bytes)",
-                    drive_file_id, temp_file_path, file_size
+                    drive_file_id,
+                    temp_file_path,
+                    file_size,
                 )
 
                 if progress_callback:
@@ -403,7 +418,9 @@ class YouTubeService:
                         os.unlink(temp_file_path)
                         logger.debug("Cleaned up temp file: %s", temp_file_path)
                     except OSError as e:
-                        logger.warning("Failed to cleanup temp file %s: %s", temp_file_path, e)
+                        logger.warning(
+                            "Failed to cleanup temp file %s: %s", temp_file_path, e
+                        )
 
         except ValueError as e:
             return UploadResult(
@@ -471,7 +488,9 @@ class YouTubeService:
             )
 
             # Adjusted progress callback for 50-100% range
-            async def adjusted_progress(progress_pct: float, bytes_uploaded: int) -> None:
+            async def adjusted_progress(
+                progress_pct: float, bytes_uploaded: int
+            ) -> None:
                 if progress_callback:
                     adjusted_pct = 50 + (progress_pct / 2)  # Map to 50-100%
                     await progress_callback(
@@ -493,7 +512,9 @@ class YouTubeService:
                 )
                 if status:
                     progress_pct = status.progress() * 100
-                    await adjusted_progress(progress_pct, int(status.resumable_progress))
+                    await adjusted_progress(
+                        progress_pct, int(status.resumable_progress)
+                    )
 
             video_id = response.get("id")
             return UploadResult(
@@ -511,7 +532,6 @@ class YouTubeService:
                 error=str(e),
             )
 
-
     def get_channel_info(self) -> dict[str, Any]:
         """Get authenticated user's YouTube channel information.
 
@@ -521,7 +541,9 @@ class YouTubeService:
         quota_tracker = get_quota_tracker()
         try:
             response = (
-                self.service.channels().list(part="snippet,statistics", mine=True).execute()
+                self.service.channels()
+                .list(part="snippet,statistics", mine=True)
+                .execute()
             )
             items = response.get("items", [])
             if items:
@@ -559,13 +581,13 @@ class YouTubeService:
 
     def check_video_exists_on_youtube(self, video_id: str) -> bool:
         """Check if a video exists on YouTube.
-        
+
         This is useful for verifying that previously uploaded videos still exist.
         Costs only 1 quota unit.
-        
+
         Args:
             video_id: YouTube video ID to check
-            
+
         Returns:
             True if video exists, False otherwise
         """
@@ -589,10 +611,10 @@ class YouTubeService:
 
     def _get_uploads_playlist_id(self) -> str | None:
         """Get the uploads playlist ID for the authenticated channel.
-        
+
         This is cached to avoid repeated API calls.
         Costs 1 quota unit on first call.
-        
+
         Returns:
             Uploads playlist ID or None if not found
         """
@@ -630,17 +652,15 @@ class YouTubeService:
             # Track quota even if request fails
             quota_tracker.track("channels.list")
 
-    def list_my_videos_optimized(
-        self, max_results: int = 25
-    ) -> list[dict[str, Any]]:
+    def list_my_videos_optimized(self, max_results: int = 25) -> list[dict[str, Any]]:
         """List videos using playlistItems API (optimized version).
-        
+
         This uses playlistItems.list which costs only 1-2 quota units
         instead of search.list which costs 100 units.
-        
+
         Args:
             max_results: Maximum number of videos to return
-            
+
         Returns:
             List of video information dicts
         """
@@ -672,13 +692,13 @@ class YouTubeService:
 
     def get_videos_batch(self, video_ids: list[str]) -> list[dict[str, Any]]:
         """Get information for multiple videos in a single request.
-        
+
         This is much more efficient than calling videos.list for each video.
         Costs only 1 quota unit for up to 50 videos.
-        
+
         Args:
             video_ids: List of YouTube video IDs (max 50)
-            
+
         Returns:
             List of video information dicts
         """
@@ -763,10 +783,13 @@ class YouTubeService:
 
             except HttpError as e:
                 if _is_retryable_error(e) and attempt < max_attempts - 1:
-                    wait_time = min(60, 4 * (2 ** attempt))  # Exponential backoff
+                    wait_time = min(60, 4 * (2**attempt))  # Exponential backoff
                     logger.warning(
                         "Retrying upload after %d seconds (attempt %d/%d): %s",
-                        wait_time, attempt + 1, max_attempts, e
+                        wait_time,
+                        attempt + 1,
+                        max_attempts,
+                        e,
                     )
                     await asyncio.sleep(wait_time)
                     last_exception = e
@@ -776,7 +799,9 @@ class YouTubeService:
         # Should not reach here, but just in case
         if last_exception:
             raise last_exception
-        return UploadResult(success=False, message="Max retries exceeded", error="Unknown error")
+        return UploadResult(
+            success=False, message="Max retries exceeded", error="Unknown error"
+        )
 
 
 def get_youtube_service() -> YouTubeService:
