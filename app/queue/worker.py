@@ -10,8 +10,12 @@ from app.config import get_settings
 
 # Removed: from app.queue.manager import get_queue_manager
 from app.queue.schemas import JobStatus, QueueJob
+from app.youtube.quota import get_quota_tracker
 from app.youtube.schemas import UploadProgress
 from app.youtube.service import YouTubeService
+
+# Import timedelta for pre-upload check
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +54,6 @@ class QueueWorker:
         """Main processing loop."""
         from app.database import get_db_context
         from app.queue.manager_db import QueueManagerDB
-        from app.youtube.quota import get_quota_tracker
 
         # Maximum wait time when quota exhausted (1 hour)
         MAX_QUOTA_WAIT_SECONDS = 3600

@@ -14,9 +14,9 @@ from app.drive.schemas import (
     FolderUploadResponse,
     SkippedFile,
 )
+from app.drive.service import DriveService
 
-# Note: DriveService is imported per-request to avoid issues with credentials
-# and multi-user contexts; use get_oauth_service() to construct DriveService instances with user-specific credentials.
+# Note: DriveService is instantiated per-request with user-specific credentials
 from app.queue.manager_db import QueueManagerDB
 from app.queue.schemas import QueueJob
 
@@ -54,7 +54,6 @@ async def list_files(
         if not credentials:
             raise ValueError("Not authenticated with Google")
 
-        from app.drive.service import DriveService
         service = DriveService(credentials)
         return service.list_files(folder_id, video_only)
     except ValueError as e:
@@ -96,7 +95,6 @@ async def scan_folder(
         if not credentials:
             raise ValueError("Not authenticated with Google")
 
-        from app.drive.service import DriveService
         service = DriveService(credentials)
         folder = service.scan_folder(
             folder_id=request.folder_id,
@@ -143,7 +141,6 @@ async def get_file_info(file_id: str, session_token: str | None = Cookie(None, a
         if not credentials:
             raise ValueError("Not authenticated with Google")
 
-        from app.drive.service import DriveService
         service = DriveService(credentials)
         return service.get_file_metadata(file_id)
     except ValueError as e:
@@ -199,7 +196,6 @@ async def upload_folder(
         credentials = await oauth_service.get_credentials(user_id)
         if not credentials:
             raise ValueError("Not authenticated with Google")
-        from app.drive.service import DriveService
         drive_service = DriveService(credentials)
 
         # Get folder info
@@ -337,4 +333,5 @@ async def upload_folder(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload folder: {e!s}",
         ) from e
+
 

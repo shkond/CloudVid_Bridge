@@ -19,7 +19,7 @@ def mock_session_manager():
     """Mock session manager for drive tests."""
     with patch("app.auth.dependencies.get_session_manager") as mock:
         manager = MagicMock()
-        manager.verify_session.return_value = {
+        manager.verify_session_token.return_value = {
             "username": "testuser",
             "user_id": "user123",
         }
@@ -63,7 +63,7 @@ class TestListFiles:
     def test_list_files_requires_auth(self, test_client):
         """Test that list files requires authentication."""
         with patch("app.auth.dependencies.get_session_manager") as mock:
-            mock.return_value.verify_session.return_value = None
+            mock.return_value.verify_session_token.return_value = None
 
             response = test_client.get("/drive/files")
 
@@ -142,7 +142,7 @@ class TestScanFolder:
     def test_scan_folder_requires_auth(self, test_client):
         """Test that folder scan requires authentication."""
         with patch("app.auth.dependencies.get_session_manager") as mock:
-            mock.return_value.verify_session.return_value = None
+            mock.return_value.verify_session_token.return_value = None
 
             response = test_client.post(
                 "/drive/scan",
@@ -207,7 +207,7 @@ class TestUploadFolder:
     def test_upload_folder_requires_auth(self, test_client):
         """Test that upload folder requires authentication."""
         with patch("app.auth.dependencies.get_session_manager") as mock:
-            mock.return_value.verify_session.return_value = None
+            mock.return_value.verify_session_token.return_value = None
 
             response = test_client.post(
                 "/drive/upload-folder",
