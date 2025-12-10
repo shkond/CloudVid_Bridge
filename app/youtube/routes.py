@@ -1,9 +1,9 @@
 """YouTube routes."""
 
-from fastapi import APIRouter, Cookie, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from google.oauth2.credentials import Credentials
 
-from app.auth.dependencies import check_app_auth, get_current_user_from_session
-from app.auth.oauth import get_oauth_service
+from app.core.dependencies import get_user_credentials, get_youtube_service
 from app.youtube.quota import get_quota_tracker
 from app.youtube.schemas import UploadRequest, UploadResult, YouTubeVideo
 from app.youtube.service import YouTubeService
@@ -12,32 +12,19 @@ router = APIRouter(prefix="/youtube", tags=["youtube"])
 
 
 @router.get("/channel")
-async def get_channel_info(session_token: str | None = Cookie(None, alias="session")) -> dict:
+async def get_channel_info(
+    service: YouTubeService = Depends(get_youtube_service),
+) -> dict:
     """Get authenticated user's YouTube channel information.
+
+    Args:
+        service: YouTubeService (injected via DI)
 
     Returns:
         Channel information
     """
     try:
-        session_data = check_app_auth(session_token)
-        if not session_data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
-        user_id = get_current_user_from_session(session_data)
-
-        oauth_service = get_oauth_service()
-        credentials = await oauth_service.get_credentials(user_id)
-        if not credentials:
-            raise ValueError("Not authenticated with Google")
-        service = YouTubeService(credentials)
         return service.get_channel_info()
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -50,30 +37,18 @@ async def list_my_videos(
     max_results: int = Query(
         default=25, ge=1, le=50, description="Max videos to return"
     ),
-    session_token: str | None = Cookie(None, alias="session"),
+    service: YouTubeService = Depends(get_youtube_service),
 ) -> list[YouTubeVideo]:
     """List videos uploaded by the authenticated user.
 
     Args:
         max_results: Maximum number of videos to return
+        service: YouTubeService (injected via DI)
 
     Returns:
         List of YouTube videos
     """
     try:
-        session_data = check_app_auth(session_token)
-        if not session_data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
-        user_id = get_current_user_from_session(session_data)
-
-        oauth_service = get_oauth_service()
-        credentials = await oauth_service.get_credentials(user_id)
-        if not credentials:
-            raise ValueError("Not authenticated with Google")
-        service = YouTubeService(credentials)
         items = service.list_my_videos(max_results)
         videos = []
         for item in items:
@@ -93,11 +68,6 @@ async def list_my_videos(
                 )
             )
         return videos
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -106,7 +76,11 @@ async def list_my_videos(
 
 
 @router.post("/upload", response_model=UploadResult)
-async def upload_video(request: UploadRequest, session_token: str | None = Cookie(None, alias="session")) -> UploadResult:
+async def upload_video(
+    request: UploadRequest,
+    service: YouTubeService = Depends(get_youtube_service),
+    credentials: Credentials = Depends(get_user_credentials),
+) -> UploadResult:
     """Upload a video from Google Drive to YouTube.
 
     This is a synchronous upload endpoint. For large files or
@@ -114,36 +88,19 @@ async def upload_video(request: UploadRequest, session_token: str | None = Cooki
 
     Args:
         request: Upload request with Drive file ID and metadata
+        service: YouTubeService (injected via DI)
+        credentials: User credentials for Drive API
 
     Returns:
         Upload result with video ID and URL
     """
     try:
-        session_data = check_app_auth(session_token)
-        if not session_data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
-        user_id = get_current_user_from_session(session_data)
-
-        oauth_service = get_oauth_service()
-        credentials = await oauth_service.get_credentials(user_id)
-        if not credentials:
-            raise ValueError("Not authenticated with Google")
-        service = YouTubeService(credentials)
         result = await service.upload_from_drive_async(
             drive_file_id=request.drive_file_id,
             metadata=request.metadata,
             drive_credentials=credentials,
         )
-
         return result
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -164,7 +121,10 @@ async def get_quota_status() -> dict:
 
 
 @router.get("/video/{video_id}/exists")
-async def check_video_exists(video_id: str, session_token: str | None = Cookie(None, alias="session")) -> dict:
+async def check_video_exists(
+    video_id: str,
+    service: YouTubeService = Depends(get_youtube_service),
+) -> dict:
     """Check if a video exists on YouTube.
 
     This is useful for verifying that previously uploaded videos still exist.
@@ -172,33 +132,17 @@ async def check_video_exists(video_id: str, session_token: str | None = Cookie(N
 
     Args:
         video_id: YouTube video ID to check
+        service: YouTubeService (injected via DI)
 
     Returns:
         Dict with exists boolean and video_id
     """
     try:
-        session_data = check_app_auth(session_token)
-        if not session_data:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
-        user_id = get_current_user_from_session(session_data)
-
-        oauth_service = get_oauth_service()
-        credentials = await oauth_service.get_credentials(user_id)
-        if not credentials:
-            raise ValueError("Not authenticated with Google")
-        service = YouTubeService(credentials)
         exists = service.check_video_exists_on_youtube(video_id)
         return {"video_id": video_id, "exists": exists}
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),
-        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to check video: {e!s}",
         ) from e
+
