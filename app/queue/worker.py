@@ -52,7 +52,7 @@ class QueueWorker:
     async def _process_loop(self) -> None:
         """Main processing loop."""
         from app.database import get_db_context
-        from app.queue.manager_db import QueueManagerDB
+        from app.queue.repositories import QueueRepository
 
         # Maximum wait time when quota exhausted (1 hour)
         MAX_QUOTA_WAIT_SECONDS = 3600
@@ -73,13 +73,14 @@ class QueueWorker:
                     continue
 
                 async with get_db_context() as db:
+                    repo = QueueRepository(db)
                     # Check for pending jobs
-                    active_jobs = await QueueManagerDB.get_active_jobs(db)
+                    active_jobs = await repo.get_active_jobs()
                     if len(active_jobs) >= self.settings.max_concurrent_uploads:
                         await asyncio.sleep(5)
                         continue
 
-                    next_job = await QueueManagerDB.get_next_pending_job(db)
+                    next_job = await repo.get_next_pending_job()
                     if not next_job:
                         await asyncio.sleep(5)
                         continue
@@ -98,10 +99,11 @@ class QueueWorker:
             job_id: Job UUID to process
         """
         from app.database import get_db_context
-        from app.queue.manager_db import QueueManagerDB
+        from app.queue.repositories import QueueRepository
 
         async with get_db_context() as db:
-            job = await QueueManagerDB.get_job(db, job_id)
+            repo = QueueRepository(db)
+            job = await repo.get_job(job_id)
             if not job:
                 return
 
@@ -119,8 +121,8 @@ class QueueWorker:
             skip_result = await self._pre_upload_check(job, youtube_service)
             if skip_result["skip"]:
                 async with get_db_context() as db:
-                    await QueueManagerDB.update_job(
-                        db,
+                    repo = QueueRepository(db)
+                    await repo.update_job(
                         job_id,
                         status=JobStatus.COMPLETED,
                         progress=100,
@@ -128,13 +130,14 @@ class QueueWorker:
                         video_id=skip_result.get("video_id"),
                         video_url=skip_result.get("video_url"),
                     )
+                    await db.commit()
                 logger.info(
                     "Job %s skipped: %s", job.id, skip_result["reason"]
                 )
                 return
 
             # Pre-upload check: validate file size from Drive metadata
-            from app.drive.service import DriveService
+            from app.drive.services import DriveService
             drive_service = DriveService(credentials)
             file_info = await drive_service.get_file_metadata(job.drive_file_id)
             file_size = int(file_info.get("size", 0))
@@ -145,24 +148,26 @@ class QueueWorker:
                 max_gb = settings.max_file_size / (1024 ** 3)
                 error_msg = f"File too large ({size_gb:.2f}GB > {max_gb:.0f}GB max)"
                 async with get_db_context() as db:
-                    await QueueManagerDB.update_job(
-                        db,
+                    repo = QueueRepository(db)
+                    await repo.update_job(
                         job_id,
                         status=JobStatus.FAILED,
                         message=error_msg,
                         error=error_msg,
                     )
+                    await db.commit()
                 logger.error("Job %s failed: %s", job.id, error_msg)
                 return
 
             # Update status to downloading
             async with get_db_context() as db:
-                await QueueManagerDB.update_job(
-                    db,
+                repo = QueueRepository(db)
+                await repo.update_job(
                     job_id,
                     status=JobStatus.DOWNLOADING,
                     message="Starting download from Google Drive...",
                 )
+                await db.commit()
 
             # Create progress callback
             # Note: This callback is async, but upload_from_drive() expects a sync callback.
@@ -173,13 +178,14 @@ class QueueWorker:
                     status = JobStatus.UPLOADING
 
                 async with get_db_context() as db:
-                    await QueueManagerDB.update_job(
-                        db,
+                    repo = QueueRepository(db)
+                    await repo.update_job(
                         job_id,
                         status=status,
                         progress=progress.progress,
                         message=progress.message,
                     )
+                    await db.commit()
 
             # Upload from Drive to YouTube with retry logic (using async version)
             result = await youtube_service.upload_from_drive_with_retry_async(
@@ -190,9 +196,9 @@ class QueueWorker:
             )
 
             async with get_db_context() as db:
+                repo = QueueRepository(db)
                 if result.success:
-                    await QueueManagerDB.update_job(
-                        db,
+                    await repo.update_job(
                         job_id,
                         status=JobStatus.COMPLETED,
                         progress=100,
@@ -200,6 +206,7 @@ class QueueWorker:
                         video_id=result.video_id,
                         video_url=result.video_url,
                     )
+                    await db.commit()
                     logger.info("Job %s completed: video_id=%s", job.id, result.video_id)
 
                     # Save upload history to database
@@ -209,25 +216,26 @@ class QueueWorker:
                         video_url=result.video_url or "",
                     )
                 else:
-                    await QueueManagerDB.update_job(
-                        db,
+                    await repo.update_job(
                         job_id,
                         status=JobStatus.FAILED,
                         message=result.message,
                         error=result.error,
                     )
+                    await db.commit()
                     logger.error("Job %s failed: %s", job.id, result.error)
 
         except Exception as e:
             logger.exception("Job %s failed with exception", job_id)
             async with get_db_context() as db:
-                await QueueManagerDB.update_job(
-                    db,
+                repo = QueueRepository(db)
+                await repo.update_job(
                     job_id,
                     status=JobStatus.FAILED,
                     message="Upload failed",
                     error=str(e),
                 )
+                await db.commit()
 
     @staticmethod
     async def _pre_upload_check(

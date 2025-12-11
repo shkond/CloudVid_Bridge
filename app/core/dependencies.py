@@ -228,7 +228,7 @@ async def get_drive_service_from_credentials(
     Returns:
         DriveService configured with the credentials
     """
-    from app.drive.service import DriveService
+    from app.drive.services import DriveService
 
     return DriveService(credentials)
 

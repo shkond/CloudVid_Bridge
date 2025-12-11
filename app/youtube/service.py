@@ -17,7 +17,7 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
 
 from app.auth.oauth import get_oauth_service
 from app.config import get_settings
-from app.drive.service import DriveService, get_drive_service
+from app.drive.services import DriveService
 from app.exceptions import (
     FileSizeExceededError,
     InsufficientDiskSpaceError,
