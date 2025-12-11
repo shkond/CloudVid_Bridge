@@ -15,13 +15,13 @@ from google.oauth2.credentials import Credentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.auth.oauth import OAuthService
 
-if TYPE_CHECKING:
-    from app.auth.oauth import OAuthService
-    from app.drive.services import DriveService
-    from app.queue.repositories import QueueRepository
-    from app.queue.services import QueueService
-    from app.youtube.service import YouTubeService
+    
+from app.drive.services import DriveService
+from app.queue.repositories import QueueRepository
+from app.queue.services import QueueService
+from app.youtube.service import YouTubeService
 
 
 # =============================================================================
