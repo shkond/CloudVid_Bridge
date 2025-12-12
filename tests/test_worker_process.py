@@ -7,7 +7,7 @@ Test categories:
 
 import asyncio
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -348,3 +348,92 @@ class TestWorkerIntegration:
 
             # Worker should check this count before starting new jobs
             assert len(active_jobs) == 1
+
+
+class TestProcessBatch:
+    """Tests for QueueWorker.process_batch method."""
+
+    @pytest.mark.asyncio
+    async def test_process_batch_empty_queue(self, test_engine):
+        """Test process_batch returns 0 when queue is empty."""
+        from app.queue.worker import QueueWorker
+
+        worker = QueueWorker()
+
+        # Mock database context to return no pending jobs
+        with patch("app.database.get_db_context") as mock_db_context:
+            mock_db = AsyncMock()
+            mock_db_context.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_db_context.return_value.__aexit__ = AsyncMock(return_value=None)
+
+            with patch("app.queue.repositories.QueueRepository") as mock_repo_class:
+                mock_repo = mock_repo_class.return_value
+                mock_repo.get_next_pending_job = AsyncMock(return_value=None)
+
+                with patch("app.youtube.quota.get_quota_tracker") as mock_quota:
+                    mock_tracker = MagicMock()
+                    mock_tracker.can_perform.return_value = True
+                    mock_tracker.get_remaining_quota.return_value = 10000
+                    mock_quota.return_value = mock_tracker
+
+                    result = await worker.process_batch()
+
+        assert result == 0
+
+    @pytest.mark.asyncio
+    async def test_process_batch_respects_max_jobs(self, test_engine):
+        """Test process_batch stops when max_jobs limit is reached."""
+        from app.queue.worker import QueueWorker
+
+        worker = QueueWorker()
+
+        # Create mock jobs
+        mock_jobs = [MagicMock(id=f"job-{i}") for i in range(5)]
+        call_count = 0
+
+        async def get_next_pending_job():
+            nonlocal call_count
+            if call_count < len(mock_jobs):
+                job = mock_jobs[call_count]
+                call_count += 1
+                return job
+            return None
+
+        with patch("app.database.get_db_context") as mock_db_context:
+            mock_db = AsyncMock()
+            mock_db_context.return_value.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_db_context.return_value.__aexit__ = AsyncMock(return_value=None)
+
+            with patch("app.queue.repositories.QueueRepository") as mock_repo_class:
+                mock_repo = mock_repo_class.return_value
+                mock_repo.get_next_pending_job = get_next_pending_job
+
+                with patch("app.youtube.quota.get_quota_tracker") as mock_quota:
+                    mock_tracker = MagicMock()
+                    mock_tracker.can_perform.return_value = True
+                    mock_tracker.get_remaining_quota.return_value = 10000
+                    mock_quota.return_value = mock_tracker
+
+                    # Mock _process_job to do nothing
+                    with patch.object(worker, "_process_job", new_callable=AsyncMock):
+                        result = await worker.process_batch(max_jobs=2)
+
+        # Should have processed exactly 2 jobs (max_jobs limit)
+        assert result == 2
+
+    @pytest.mark.asyncio
+    async def test_process_batch_stops_on_quota_exhausted(self, test_engine):
+        """Test process_batch returns 0 when quota is exhausted."""
+        from app.queue.worker import QueueWorker
+
+        worker = QueueWorker()
+
+        with patch("app.youtube.quota.get_quota_tracker") as mock_quota:
+            mock_tracker = MagicMock()
+            mock_tracker.can_perform.return_value = False  # Quota exhausted
+            mock_tracker.get_remaining_quota.return_value = 50
+            mock_quota.return_value = mock_tracker
+
+            result = await worker.process_batch()
+
+        assert result == 0
