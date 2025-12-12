@@ -194,19 +194,34 @@ class FolderUploadService:
         today = date.today().isoformat()
         title_base = file_name.rsplit(".", 1)[0] if "." in file_name else file_name
 
-        # Process templates
-        title = settings.title_template.format(
-            filename=title_base,
-            folder=folder_name,
-            folder_path=folder_path,
-            upload_date=today,
-        )
-        description = settings.description_template.format(
-            filename=title_base,
-            folder=folder_name,
-            folder_path=folder_path,
-            upload_date=today,
-        )
+        # Process templates with error handling for unknown placeholders
+        try:
+            title = settings.title_template.format(
+                filename=title_base,
+                folder=folder_name,
+                folder_path=folder_path,
+                upload_date=today,
+            )
+        except KeyError as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Unknown placeholder in title_template: %s, using filename", e
+            )
+            title = title_base
+
+        try:
+            description = settings.description_template.format(
+                filename=title_base,
+                folder=folder_name,
+                folder_path=folder_path,
+                upload_date=today,
+            )
+        except KeyError as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Unknown placeholder in description_template: %s, using default", e
+            )
+            description = f"Uploaded from {folder_path}"
 
         # Add MD5 hash to description if enabled
         if settings.include_md5_hash and md5_checksum:

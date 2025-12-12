@@ -10,6 +10,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Install system dependencies
+# - curl: Health checks and HTTP requests
+# - wget: Downloading files during build/runtime
+# - ca-certificates: SSL/TLS certificate verification
+# - git: Required for pip git dependencies
+# - procps: Process management utilities (ps, top)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \

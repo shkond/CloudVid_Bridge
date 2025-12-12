@@ -285,9 +285,16 @@ class QueueWorker:
         )
 
         if exists:
-            # Update last_verified_at
+            # Update last_verified_at (non-critical, failure is acceptable)
             history.last_verified_at = now
-            await db.commit()
+            try:
+                await db.commit()
+            except Exception:
+                logger.warning(
+                    "Failed to update last_verified_at for %s, but still skipping",
+                    history.youtube_video_id,
+                )
+                await db.rollback()
 
             return {
                 "skip": True,
@@ -384,23 +391,30 @@ class QueueWorker:
         """
         from app.models import UploadHistory
 
-        history = UploadHistory(
-            drive_file_id=job.drive_file_id,
-            drive_file_name=job.drive_file_name,
-            drive_md5_checksum=job.drive_md5_checksum or "",
-            youtube_video_id=video_id,
-            youtube_video_url=video_url,
-            folder_path=job.folder_path or "",
-            status="completed",
-            uploaded_at=datetime.now(UTC),
-        )
-        db.add(history)
-        await db.commit()
-        logger.info(
-            "Saved upload history: %s -> %s",
-            job.drive_file_name,
-            video_id,
-        )
+        try:
+            history = UploadHistory(
+                drive_file_id=job.drive_file_id,
+                drive_file_name=job.drive_file_name,
+                drive_md5_checksum=job.drive_md5_checksum or "",
+                youtube_video_id=video_id,
+                youtube_video_url=video_url,
+                folder_path=job.folder_path or "",
+                status="completed",
+                uploaded_at=datetime.now(UTC),
+            )
+            db.add(history)
+            await db.commit()
+            logger.info(
+                "Saved upload history: %s -> %s",
+                job.drive_file_name,
+                video_id,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to save upload history for %s (non-critical)",
+                job.drive_file_name,
+            )
+            await db.rollback()
 
 
 

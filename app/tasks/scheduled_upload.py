@@ -16,10 +16,6 @@ Environment Variables:
 import asyncio
 import logging
 import os
-import sys
-
-# Ensure project root is in path
-sys.path.insert(0, os.getcwd())
 
 from app.auth.oauth import get_oauth_service
 from app.database import close_db, get_db_context, init_db
@@ -47,7 +43,11 @@ async def run_scheduled_upload() -> None:
     # Read configuration from environment
     user_id = os.getenv("TARGET_USER_ID", "admin")
     folder_id = os.getenv("TARGET_FOLDER_ID", "root")
-    max_files = int(os.getenv("MAX_FILES_PER_RUN", "50"))
+    try:
+        max_files = int(os.getenv("MAX_FILES_PER_RUN", "50"))
+    except ValueError:
+        logger.warning("Invalid MAX_FILES_PER_RUN value, using default: 50")
+        max_files = 50
 
     logger.info("Starting scheduled upload...")
     logger.info("  User ID: %s", user_id)
