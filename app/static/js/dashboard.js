@@ -275,8 +275,18 @@ async function cancelJob(jobId) {
     try {
         const response = await fetch(`/queue/jobs/${jobId}/cancel`, { method: 'POST' });
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to cancel job');
+            // Handle both JSON and non-JSON error responses
+            const contentType = response.headers.get('content-type');
+            let errorMessage = 'Failed to cancel job';
+            if (contentType && contentType.includes('application/json')) {
+                const error = await response.json();
+                errorMessage = error.detail || errorMessage;
+            } else {
+                // Non-JSON response (e.g., "Internal Server Error")
+                const text = await response.text();
+                errorMessage = text || `HTTP ${response.status}`;
+            }
+            throw new Error(errorMessage);
         }
         showToast('ジョブをキャンセルしました', 'success');
         refreshQueueList();
@@ -291,8 +301,17 @@ async function deleteJob(jobId) {
     try {
         const response = await fetch(`/queue/jobs/${jobId}`, { method: 'DELETE' });
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to delete job');
+            // Handle both JSON and non-JSON error responses
+            const contentType = response.headers.get('content-type');
+            let errorMessage = 'Failed to delete job';
+            if (contentType && contentType.includes('application/json')) {
+                const error = await response.json();
+                errorMessage = error.detail || errorMessage;
+            } else {
+                const text = await response.text();
+                errorMessage = text || `HTTP ${response.status}`;
+            }
+            throw new Error(errorMessage);
         }
         showToast('ジョブを削除しました', 'success');
         refreshQueueList();

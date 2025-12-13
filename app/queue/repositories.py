@@ -130,7 +130,7 @@ class QueueRepository(QueueRepositoryProtocol):
             QueueJob or None if not found
         """
         result = await self._db.execute(
-            select(QueueJobModel).where(QueueJobModel.id == job_id)
+            select(QueueJobModel).where(QueueJobModel.id == str(job_id))
         )
         model = result.scalars().first()
         return self._model_to_schema(model) if model else None
@@ -160,7 +160,7 @@ class QueueRepository(QueueRepositoryProtocol):
             Updated QueueJob or None if not found
         """
         result = await self._db.execute(
-            select(QueueJobModel).where(QueueJobModel.id == job_id)
+            select(QueueJobModel).where(QueueJobModel.id == str(job_id))
         )
         model = result.scalars().first()
 
@@ -196,7 +196,7 @@ class QueueRepository(QueueRepositoryProtocol):
             Cancelled QueueJob or None if not found or not cancellable
         """
         result = await self._db.execute(
-            select(QueueJobModel).where(QueueJobModel.id == job_id)
+            select(QueueJobModel).where(QueueJobModel.id == str(job_id))
         )
         model = result.scalars().first()
 
@@ -227,7 +227,7 @@ class QueueRepository(QueueRepositoryProtocol):
             True if deleted, False if not found
         """
         result = await self._db.execute(
-            delete(QueueJobModel).where(QueueJobModel.id == job_id)
+            delete(QueueJobModel).where(QueueJobModel.id == str(job_id))
         )
         return result.rowcount > 0
 
@@ -448,7 +448,7 @@ class QueueRepository(QueueRepositoryProtocol):
             Updated QueueJob or None if not found
         """
         result = await self._db.execute(
-            select(QueueJobModel).where(QueueJobModel.id == job_id)
+            select(QueueJobModel).where(QueueJobModel.id == str(job_id))
         )
         model = result.scalars().first()
 
