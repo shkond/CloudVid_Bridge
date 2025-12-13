@@ -1,9 +1,9 @@
 """API routes for schedule settings management."""
 
 import logging
-from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_user_id_from_session
 from app.database import get_db
@@ -16,9 +16,6 @@ from app.settings.schemas import (
     ScheduleSettingsUpdate,
     extract_folder_id,
 )
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
