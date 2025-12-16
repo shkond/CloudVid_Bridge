@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     auth_username: str = ""
     auth_password: str = ""
 
+    # Heroku Platform API (for worker auto-scaling)
+    heroku_api_key: str | None = None
+    heroku_app_name: str | None = None
+
     @property
     def scopes_list(self) -> list[str]:
         """Return Google scopes as a list."""
