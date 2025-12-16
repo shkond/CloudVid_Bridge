@@ -85,6 +85,7 @@ cloudvid-bridge/
 | Web Application | `uvicorn app.main:app` |
 | Background Worker | `python -m app.queue.worker` |
 | Scheduled Upload | `python -m app.tasks.scheduled_upload` |
+| Worker Auto-Scaling | `python -m app.tasks.check_and_scale_worker` |
 | Database Init | `python -c "from app.database import init_db; ..."` |
 
 ## Environment Variables
@@ -98,8 +99,8 @@ cloudvid-bridge/
 | `AUTH_USERNAME` | App login username | ✓ (prod) |
 | `AUTH_PASSWORD` | App login password | ✓ (prod) |
 | `DATABASE_URL` | Database connection URL | ✓ |
+| `HEROKU_API_KEY` | Heroku Platform API key | For auto-scaling |
+| `HEROKU_APP_NAME` | Heroku app name | For auto-scaling |
 | `MAX_CONCURRENT_UPLOADS` | Concurrent upload limit | Default: 2 |
 | `UPLOAD_CHUNK_SIZE` | Upload chunk size (bytes) | Default: 10MB |
-| `TARGET_USER_ID` | User ID for scheduled tasks | Default: admin |
-| `TARGET_FOLDER_ID` | Drive folder ID for scheduled scan | Default: root |
-| `MAX_FILES_PER_RUN` | Max files per scheduled run | Default: 50 |
+

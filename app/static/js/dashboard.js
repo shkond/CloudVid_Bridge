@@ -9,6 +9,7 @@ let currentFolderName = 'My Drive';
 let scannedVideos = [];
 let selectedFolderId = null;
 let selectedFolderName = null;
+let isNavigating = false; // Debounce flag for folder navigation
 
 // DOM Elements
 const elements = {
@@ -428,9 +429,16 @@ async function loadFolderContents(folderId) {
 
         item.innerHTML = `${icon}<span>${file.name}</span>`;
 
-        item.addEventListener('click', () => {
+        item.addEventListener('click', (e) => {
+            // Prevent double-click from firing twice
+            if (isNavigating) {
+                console.log('[FolderBrowser] Navigation in progress, ignoring click');
+                return;
+            }
+
             if (file.file_type === 'folder') {
                 // Single-click to enter folder for easier navigation
+                console.log(`[FolderBrowser] Navigating to folder: ${file.name} (${file.id})`);
                 navigateToFolder(file.id, file.name);
                 return;
             }
@@ -447,6 +455,26 @@ async function loadFolderContents(folderId) {
 }
 
 function navigateToFolder(folderId, folderName) {
+    // Debounce: prevent rapid navigation (e.g., double-click)
+    if (isNavigating) {
+        console.log(`[FolderBrowser] Ignoring duplicate navigation to: ${folderName}`);
+        return;
+    }
+    isNavigating = true;
+
+    // Validate folder ID
+    if (!folderId || typeof folderId !== 'string') {
+        console.error(`[FolderBrowser] Invalid folder ID: ${folderId}`);
+        isNavigating = false;
+        return;
+    }
+
+    console.log(`[FolderBrowser] Navigating to: ${folderName} (${folderId})`);
+
+    // Update current folder tracking for "Select current folder" functionality
+    currentFolderId = folderId;
+    currentFolderName = folderName;
+
     // Update breadcrumb
     if (elements.breadcrumb) {
         const item = document.createElement('span');
@@ -458,11 +486,19 @@ function navigateToFolder(folderId, folderName) {
             while (item.nextSibling) {
                 item.nextSibling.remove();
             }
+            currentFolderId = folderId;
+            currentFolderName = folderName;
             loadFolderContents(folderId);
         });
         elements.breadcrumb.appendChild(item);
     }
-    loadFolderContents(folderId);
+
+    loadFolderContents(folderId).finally(() => {
+        // Release debounce after navigation completes
+        setTimeout(() => {
+            isNavigating = false;
+        }, 100);
+    });
 }
 
 function selectCurrentFolder() {
@@ -476,11 +512,31 @@ function selectCurrentFolder() {
 }
 
 function selectFolder() {
-    if (!selectedFolderId) return;
+    // If nothing selected but we're in a subfolder, select current folder
+    if (!selectedFolderId && currentFolderId && currentFolderId !== 'root') {
+        selectedFolderId = currentFolderId;
+        selectedFolderName = currentFolderName;
+    }
+
+    if (!selectedFolderId) {
+        showToast('フォルダを選択してください', 'warning');
+        return;
+    }
+
+    // Validate folder URL format
+    const folderUrl = `https://drive.google.com/drive/folders/${selectedFolderId}`;
+    if (!/^[a-zA-Z0-9_-]+$/.test(selectedFolderId)) {
+        console.error(`[FolderBrowser] Invalid folder ID format: ${selectedFolderId}`);
+        showToast('不正なフォルダIDです', 'error');
+        return;
+    }
+    console.log(`[FolderBrowser] Selected folder: ${selectedFolderName} (${selectedFolderId})`);
+    console.log(`[FolderBrowser] Folder URL: ${folderUrl}`);
 
     if (elements.folderPath) elements.folderPath.value = selectedFolderName || 'Selected Folder';
     if (elements.folderId) elements.folderId.value = selectedFolderId;
 
+    // Update current folder for schedule settings
     currentFolderId = selectedFolderId;
     currentFolderName = selectedFolderName;
 
