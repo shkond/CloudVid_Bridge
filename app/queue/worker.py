@@ -138,7 +138,7 @@ class QueueWorker:
                     return
 
                 # Pre-upload check: validate file size from Drive metadata
-                drive_service = DriveService(credentials)
+                drive_service = DriveService(credentials=credentials)
                 file_info = await drive_service.get_file_metadata(job.drive_file_id)
                 file_size = int(file_info.get("size", 0))
 

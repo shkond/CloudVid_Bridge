@@ -226,7 +226,7 @@ async def get_drive_service_from_credentials(
     """
     from app.drive.services import DriveService
 
-    return DriveService(credentials)
+    return DriveService(credentials=credentials)
 
 
 async def get_youtube_service_from_credentials(
