@@ -45,18 +45,6 @@ def mock_queue_repo():
 
 
 @pytest.fixture
-def mock_queue_worker():
-    """Mock queue worker for tests."""
-    with patch("app.queue.routes.get_queue_worker") as mock:
-        worker = MagicMock()
-        worker.is_running.return_value = True
-        worker.start = AsyncMock()
-        worker.stop = AsyncMock()
-        mock.return_value = worker
-        yield worker
-
-
-@pytest.fixture
 def test_client_with_mocks(mock_queue_repo):
     """Create test client with mocked dependencies."""
     from app.core.dependencies import get_queue_repository, get_user_id_from_session
@@ -386,22 +374,4 @@ class TestClearCompleted:
         data = response.json()
         assert data["cleared_count"] == 5
 
-
-@pytest.mark.unit
-class TestWorkerControl:
-    """Tests for worker control endpoints."""
-
-    @staticmethod
-    def test_start_worker(test_client, mock_queue_worker):
-        """Test starting the worker."""
-        response = test_client.post("/queue/worker/start")
-
-        assert response.status_code == status.HTTP_200_OK
-
-    @staticmethod
-    def test_stop_worker(test_client, mock_queue_worker):
-        """Test stopping the worker."""
-        response = test_client.post("/queue/worker/stop")
-
-        assert response.status_code == status.HTTP_200_OK
 

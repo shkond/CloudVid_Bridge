@@ -61,6 +61,16 @@ const elements = {
     folderValidationStatus: document.getElementById('folder-validation-status'),
 };
 
+// Helper Functions
+function buildFolderUrl() {
+    // Build Google Drive folder URL from the currently selected folder
+    const folderId = elements.folderId?.value;
+    if (!folderId || folderId === 'root') {
+        return '';
+    }
+    return `https://drive.google.com/drive/folders/${folderId}`;
+}
+
 // API Functions
 async function fetchFiles(folderId = 'root') {
     try {
@@ -145,21 +155,21 @@ async function loadScheduleSettings() {
 }
 
 async function saveScheduleSettings() {
-    const folderUrl = elements.scheduleFolderUrl?.value?.trim();
+    const folderUrl = buildFolderUrl();
     if (!folderUrl) {
-        showToast('フォルダURLを入力してください', 'error');
+        showToast('フォルダを選択してください', 'error');
         return false;
     }
 
     const settings = {
-        folder_url: folderUrl,
+        folder_url: buildFolderUrl(),
         max_files_per_run: parseInt(elements.scheduleMaxFiles?.value || '50', 10),
-        title_template: elements.scheduleTitleTemplate?.value || '{filename}',
-        description_template: elements.scheduleDescriptionTemplate?.value || 'Uploaded from {folder_path}',
-        default_privacy: elements.schedulePrivacy?.value || 'private',
-        recursive: elements.scheduleRecursive?.checked ?? true,
-        skip_duplicates: elements.scheduleSkipDuplicates?.checked ?? true,
-        include_md5_hash: elements.scheduleIncludeMd5?.checked ?? true,
+        title_template: elements.titleTemplate?.value || '{filename}',
+        description_template: elements.descriptionTemplate?.value || '',
+        default_privacy: elements.privacyStatus?.value || 'private',
+        recursive: elements.recursiveCheck?.checked ?? true,
+        skip_duplicates: elements.skipDuplicatesCheck?.checked ?? true,
+        include_md5_hash: elements.includeMd5Check?.checked ?? true,
         is_enabled: elements.scheduleEnabled?.checked ?? false,
     };
 
@@ -256,17 +266,25 @@ function updateScheduleStatusDisplay(enabled) {
 function populateScheduleForm(settings) {
     if (!settings) return;
 
-    if (elements.scheduleFolderUrl) elements.scheduleFolderUrl.value = settings.folder_url || '';
+    // Populate unified settings fields
     if (elements.scheduleMaxFiles) elements.scheduleMaxFiles.value = settings.max_files_per_run || 50;
-    if (elements.scheduleTitleTemplate) elements.scheduleTitleTemplate.value = settings.title_template || '{filename}';
-    if (elements.scheduleDescriptionTemplate) elements.scheduleDescriptionTemplate.value = settings.description_template || '';
-    if (elements.schedulePrivacy) elements.schedulePrivacy.value = settings.default_privacy || 'private';
-    if (elements.scheduleRecursive) elements.scheduleRecursive.checked = settings.recursive ?? true;
-    if (elements.scheduleSkipDuplicates) elements.scheduleSkipDuplicates.checked = settings.skip_duplicates ?? true;
-    if (elements.scheduleIncludeMd5) elements.scheduleIncludeMd5.checked = settings.include_md5_hash ?? true;
+    if (elements.titleTemplate) elements.titleTemplate.value = settings.title_template || '{filename}';
+    if (elements.descriptionTemplate) elements.descriptionTemplate.value = settings.description_template || '';
+    if (elements.privacyStatus) elements.privacyStatus.value = settings.default_privacy || 'private';
+    if (elements.recursiveCheck) elements.recursiveCheck.checked = settings.recursive ?? true;
+    if (elements.skipDuplicatesCheck) elements.skipDuplicatesCheck.checked = settings.skip_duplicates ?? true;
+    if (elements.includeMd5Check) elements.includeMd5Check.checked = settings.include_md5_hash ?? true;
     if (elements.scheduleEnabled) elements.scheduleEnabled.checked = settings.is_enabled ?? false;
     updateScheduleStatusDisplay(settings.is_enabled);
     if (elements.deleteScheduleBtn) elements.deleteScheduleBtn.style.display = 'inline-block';
+
+    // Set folder from saved settings if available
+    if (settings.folder_id && settings.folder_url) {
+        if (elements.folderId) elements.folderId.value = settings.folder_id;
+        if (elements.folderPath) elements.folderPath.value = settings.folder_name || settings.folder_id;
+        if (elements.uploadSettings) elements.uploadSettings.style.display = 'block';
+        if (elements.videoPreview) elements.videoPreview.style.display = 'block';
+    }
 }
 
 async function cancelJob(jobId) {
@@ -412,12 +430,11 @@ async function loadFolderContents(folderId) {
 
         item.addEventListener('click', () => {
             if (file.file_type === 'folder') {
-                // Double-click to enter folder
-                item.addEventListener('dblclick', () => {
-                    navigateToFolder(file.id, file.name);
-                });
+                // Single-click to enter folder for easier navigation
+                navigateToFolder(file.id, file.name);
+                return;
             }
-            // Select this item
+            // For non-folder items (videos), select them
             document.querySelectorAll('.folder-item.selected').forEach(el => el.classList.remove('selected'));
             item.classList.add('selected');
             selectedFolderId = file.id;
@@ -633,6 +650,9 @@ async function refreshQueueList() {
     elements.queueList.innerHTML = '';
 
     data.jobs.forEach(job => {
+        // Skip completed jobs - they're automatically in upload_history
+        if (job.status === 'completed') return;
+
         const item = document.createElement('div');
         item.className = `queue-item status-${job.status}`;
 
