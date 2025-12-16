@@ -6,6 +6,7 @@ from sqlalchemy import BigInteger, Boolean, DateTime, Float, Integer, String, Te
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.types import GUID
 
 
 class UploadHistory(Base):
@@ -53,17 +54,17 @@ class UploadHistory(Base):
 
 class QueueJobModel(Base):
     """Persistent queue job for upload queue.
-    
+
     This model stores upload jobs in the database for persistence
     across server restarts and for communication between web and worker processes.
     """
 
     __tablename__ = "queue_jobs"
 
-    # UUID stored as String(36) for SQLite compatibility
-    # Type annotation uses str to match actual database type
+    # UUID using custom GUID type for cross-database compatibility
+    # PostgreSQL: native UUID type, SQLite: String(36)
     id: Mapped[str] = mapped_column(
-        String(36),
+        GUID(),
         primary_key=True,
     )
     user_id: Mapped[str] = mapped_column(
@@ -116,7 +117,7 @@ class QueueJobModel(Base):
 
 class OAuthToken(Base):
     """Encrypted OAuth token storage.
-    
+
     Stores OAuth credentials with encryption for security.
     Tokens are encrypted using Fernet symmetric encryption.
     """
@@ -156,10 +157,10 @@ class OAuthToken(Base):
 
 class ScheduleSettings(Base):
     """User's schedule settings for Heroku Scheduler.
-    
+
     Stores per-user configuration for automated folder uploads.
     Replaces environment variables: TARGET_USER_ID, TARGET_FOLDER_ID, MAX_FILES_PER_RUN.
-    
+
     Multiple users can have enabled settings; scheduler processes all sequentially.
     """
 
