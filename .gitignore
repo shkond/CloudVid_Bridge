@@ -2,6 +2,16 @@
 __pycache__/
 *.py[cod]
 *$py.class
+# 依存関係
+node_modules/
+
+# Jest生成ファイル
+coverage/
+.jest-cache/
+
+# テストレポート
+junit.xml
+test-results/
 
 # C extensions
 *.so

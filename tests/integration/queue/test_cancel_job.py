@@ -5,12 +5,12 @@ to reproduce the "Internal Server Error" issue when cancelling
 downloading jobs.
 """
 
-import pytest
 from datetime import UTC, datetime
 from uuid import uuid4
 
+import pytest
 from fastapi import status
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.main import app

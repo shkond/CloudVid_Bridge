@@ -17,9 +17,9 @@ class HerokuClient:
     
     Uses the Heroku Formation API to scale dynos up/down.
     """
-    
+
     BASE_URL = "https://api.heroku.com"
-    
+
     def __init__(self, api_key: str, app_name: str) -> None:
         """Initialize Heroku client.
         
@@ -34,7 +34,7 @@ class HerokuClient:
             "Accept": "application/vnd.heroku+json; version=3",
             "Content-Type": "application/json",
         }
-    
+
     async def get_dyno_quantity(self, dyno_type: str = "worker") -> int:
         """Get current dyno quantity for a process type.
         
@@ -45,26 +45,26 @@ class HerokuClient:
             Number of dynos currently running
         """
         url = f"{self.BASE_URL}/apps/{self.app_name}/formation/{dyno_type}"
-        
+
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(url, headers=self._headers)
-                
+
                 if response.status_code == 404:
                     # Process type doesn't exist yet
                     logger.warning("Process type '%s' not found", dyno_type)
                     return 0
-                    
+
                 response.raise_for_status()
                 data: dict[str, Any] = response.json()
                 quantity = data.get("quantity", 0)
                 logger.info("Current %s dyno quantity: %d", dyno_type, quantity)
                 return quantity
-                
+
             except httpx.HTTPError as e:
                 logger.error("Failed to get dyno quantity: %s", e)
                 raise
-    
+
     async def scale_dyno(self, dyno_type: str = "worker", quantity: int = 1) -> bool:
         """Scale a dyno process to specified quantity.
         
@@ -76,7 +76,7 @@ class HerokuClient:
             True if scaling succeeded
         """
         url = f"{self.BASE_URL}/apps/{self.app_name}/formation"
-        
+
         payload = {
             "updates": [
                 {
@@ -85,27 +85,27 @@ class HerokuClient:
                 }
             ]
         }
-        
+
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.patch(
-                    url, 
-                    headers=self._headers, 
+                    url,
+                    headers=self._headers,
                     json=payload
                 )
                 response.raise_for_status()
-                
+
                 logger.info(
-                    "Scaled %s dyno to %d", 
-                    dyno_type, 
+                    "Scaled %s dyno to %d",
+                    dyno_type,
                     quantity
                 )
                 return True
-                
+
             except httpx.HTTPError as e:
                 logger.error("Failed to scale dyno: %s", e)
                 raise
-    
+
     async def ensure_worker_running(self) -> bool:
         """Ensure worker dyno is running (scale to 1 if not).
         
@@ -116,7 +116,7 @@ class HerokuClient:
         if current == 0:
             return await self.scale_dyno("worker", 1)
         return True
-    
+
     async def stop_worker(self) -> bool:
         """Stop worker dyno (scale to 0).
         

@@ -37,19 +37,19 @@ async def check_queue_has_jobs() -> bool:
     """
     async with get_db_context() as db:
         repo = QueueRepository(db)
-        
+
         # Check for pending jobs
         pending_jobs = await repo.get_pending_jobs()
         if pending_jobs:
             logger.info("Found %d pending jobs", len(pending_jobs))
             return True
-        
+
         # Check for active jobs (downloading/uploading)
         active_jobs = await repo.get_active_jobs()
         if active_jobs:
             logger.info("Found %d active jobs", len(active_jobs))
             return True
-        
+
         logger.info("No pending or active jobs found")
         return False
 
@@ -59,28 +59,28 @@ async def check_and_scale_worker() -> None:
     logger.info("=" * 60)
     logger.info("Starting worker scaling check...")
     logger.info("=" * 60)
-    
+
     settings = get_settings()
-    
+
     # Validate Heroku configuration
     if not settings.heroku_api_key or not settings.heroku_app_name:
         logger.error(
             "HEROKU_API_KEY and HEROKU_APP_NAME environment variables required"
         )
         sys.exit(1)
-    
+
     await init_db()
-    
+
     try:
         # Check if there are jobs to process
         has_jobs = await check_queue_has_jobs()
-        
+
         # Create Heroku client
         heroku = HerokuClient(
             api_key=settings.heroku_api_key,
             app_name=settings.heroku_app_name,
         )
-        
+
         if has_jobs:
             # Ensure worker is running
             logger.info("Jobs found - ensuring worker is running...")
@@ -91,11 +91,11 @@ async def check_and_scale_worker() -> None:
             logger.info("No jobs - stopping worker to save dyno hours...")
             await heroku.stop_worker()
             logger.info("Worker dyno stopped")
-            
+
     except Exception:
         logger.exception("Failed to check/scale worker")
         sys.exit(1)
-        
+
     finally:
         await close_db()
         logger.info("=" * 60)
