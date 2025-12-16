@@ -26,6 +26,12 @@
                     <div class="avatar-placeholder">{{ google_user.name[0] if google_user.name else 'U' }}</div>
                     {% endif %}
                 </div>
+                <div id="quota-status" class="quota-status" style="display: none;" title="YouTube API Quota Usage">
+                    <div class="quota-pill">
+                        <span class="quota-icon">📊</span>
+                        <span class="quota-text">--%</span>
+                    </div>
+                </div>
                 <span class="user-name">{{ google_user.name or google_user.email }}</span>
                 {% endif %}
                 <a href="/auth/logout" class="btn-logout">ログアウト</a>
@@ -93,7 +99,7 @@
                         <button id="browse-folders" class="btn-secondary">参照</button>
                     </div>
 
-                    <!-- Upload Settings -->
+                    <!-- Unified Upload Settings -->
                     <div class="upload-settings" id="upload-settings" style="display: none;">
                         <h3>アップロード設定</h3>
                         <div class="setting-row">
@@ -123,6 +129,30 @@
                             <label>
                                 <input type="checkbox" id="include-md5" checked> MD5ハッシュを追加
                             </label>
+                        </div>
+
+                        <!-- Schedule Settings (integrated) -->
+                        <div class="schedule-settings-panel">
+                            <div class="schedule-header">
+                                <h4>スケジュール設定</h4>
+                                <div class="schedule-toggle">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="schedule-enabled">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <span id="schedule-status" class="schedule-status">無効</span>
+                                </div>
+                            </div>
+                            <p class="schedule-description">Heroku Schedulerで自動アップロードを有効にします。</p>
+                            <div class="setting-row">
+                                <label for="schedule-max-files">1回あたりの最大ファイル数</label>
+                                <input type="number" id="schedule-max-files" min="1" max="100" value="50">
+                            </div>
+                            <div class="setting-actions">
+                                <button id="save-schedule" class="btn-primary">設定を保存</button>
+                                <button id="delete-schedule" class="btn-danger btn-small"
+                                    style="display: none;">削除</button>
+                            </div>
                         </div>
                     </div>
 
@@ -158,8 +188,6 @@
                     </h2>
                     <div class="queue-actions">
                         <span class="badge" id="queue-count">0</span>
-                        <button id="start-worker" class="btn-small btn-success">開始</button>
-                        <button id="stop-worker" class="btn-small btn-danger" disabled>停止</button>
                     </div>
                 </div>
                 <div class="card-body">
@@ -208,8 +236,15 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button id="select-folder" class="btn-primary" disabled>選択</button>
-            <button id="cancel-select" class="btn-secondary">キャンセル</button>
+            <div class="modal-actions-left">
+                <button id="select-current-folder" class="btn-secondary" title="現在開いているフォルダを選択">
+                    このフォルダを選択
+                </button>
+            </div>
+            <div class="modal-actions-right">
+                <button id="select-folder" class="btn-primary" disabled>選択</button>
+                <button id="cancel-select" class="btn-secondary">キャンセル</button>
+            </div>
         </div>
     </div>
 </div>

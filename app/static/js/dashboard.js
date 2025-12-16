@@ -9,6 +9,7 @@ let currentFolderName = 'My Drive';
 let scannedVideos = [];
 let selectedFolderId = null;
 let selectedFolderName = null;
+let isNavigating = false; // Debounce flag for folder navigation
 
 // DOM Elements
 const elements = {
@@ -24,8 +25,6 @@ const elements = {
     queueList: document.getElementById('queue-list'),
     queueCount: document.getElementById('queue-count'),
     progressInfo: document.getElementById('progress-info'),
-    startWorkerBtn: document.getElementById('start-worker'),
-    stopWorkerBtn: document.getElementById('stop-worker'),
     // Modal
     modal: document.getElementById('folder-modal'),
     closeModal: document.getElementById('close-modal'),
@@ -42,7 +41,36 @@ const elements = {
     includeMd5Check: document.getElementById('include-md5'),
     // Toast
     toastContainer: document.getElementById('toast-container'),
+    // Quota
+    quotaStatus: document.getElementById('quota-status'),
+    // Updates
+    selectCurrentFolderBtn: document.getElementById('select-current-folder'),
+    // Schedule Settings
+    scheduleFolderUrl: document.getElementById('schedule-folder-url'),
+    scheduleMaxFiles: document.getElementById('schedule-max-files'),
+    scheduleTitleTemplate: document.getElementById('schedule-title-template'),
+    scheduleDescriptionTemplate: document.getElementById('schedule-description-template'),
+    schedulePrivacy: document.getElementById('schedule-privacy'),
+    scheduleRecursive: document.getElementById('schedule-recursive'),
+    scheduleSkipDuplicates: document.getElementById('schedule-skip-duplicates'),
+    scheduleIncludeMd5: document.getElementById('schedule-include-md5'),
+    scheduleEnabled: document.getElementById('schedule-enabled'),
+    scheduleStatus: document.getElementById('schedule-status'),
+    saveScheduleBtn: document.getElementById('save-schedule'),
+    deleteScheduleBtn: document.getElementById('delete-schedule'),
+    validateFolderBtn: document.getElementById('validate-folder'),
+    folderValidationStatus: document.getElementById('folder-validation-status'),
 };
+
+// Helper Functions
+function buildFolderUrl() {
+    // Build Google Drive folder URL from the currently selected folder
+    const folderId = elements.folderId?.value;
+    if (!folderId || folderId === 'root') {
+        return '';
+    }
+    return `https://drive.google.com/drive/folders/${folderId}`;
+}
 
 // API Functions
 async function fetchFiles(folderId = 'root') {
@@ -114,27 +142,231 @@ async function getQueueStatus() {
     }
 }
 
-async function startWorker() {
+// Schedule Settings API Functions
+async function loadScheduleSettings() {
     try {
-        const response = await fetch('/queue/worker/start', { method: 'POST' });
-        if (!response.ok) throw new Error('Failed to start worker');
-        showToast('ワーカーを開始しました', 'success');
+        const response = await fetch('/settings/schedule');
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Failed to load schedule settings:', error);
+        return null;
+    }
+}
+
+async function saveScheduleSettings() {
+    const folderUrl = buildFolderUrl();
+    if (!folderUrl) {
+        showToast('フォルダを選択してください', 'error');
+        return false;
+    }
+
+    const settings = {
+        folder_url: buildFolderUrl(),
+        max_files_per_run: parseInt(elements.scheduleMaxFiles?.value || '50', 10),
+        title_template: elements.titleTemplate?.value || '{filename}',
+        description_template: elements.descriptionTemplate?.value || '',
+        default_privacy: elements.privacyStatus?.value || 'private',
+        recursive: elements.recursiveCheck?.checked ?? true,
+        skip_duplicates: elements.skipDuplicatesCheck?.checked ?? true,
+        include_md5_hash: elements.includeMd5Check?.checked ?? true,
+        is_enabled: elements.scheduleEnabled?.checked ?? false,
+    };
+
+    try {
+        const response = await fetch('/settings/schedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings),
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save settings');
+        }
+        showToast('スケジュール設定を保存しました', 'success');
+        if (elements.deleteScheduleBtn) elements.deleteScheduleBtn.style.display = 'inline-block';
         return true;
     } catch (error) {
-        showToast('ワーカー開始に失敗しました', 'error');
+        showToast(`保存失敗: ${error.message}`, 'error');
         return false;
     }
 }
 
-async function stopWorker() {
+async function deleteScheduleSettings() {
+    if (!confirm('スケジュール設定を削除してもよろしいですか？')) return false;
+
     try {
-        const response = await fetch('/queue/worker/stop', { method: 'POST' });
-        if (!response.ok) throw new Error('Failed to stop worker');
-        showToast('ワーカーを停止しました', 'success');
+        const response = await fetch('/settings/schedule', { method: 'DELETE' });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete settings');
+        }
+        showToast('スケジュール設定を削除しました', 'success');
+        // Reset form
+        if (elements.scheduleFolderUrl) elements.scheduleFolderUrl.value = '';
+        if (elements.scheduleEnabled) elements.scheduleEnabled.checked = false;
+        updateScheduleStatusDisplay(false);
+        if (elements.deleteScheduleBtn) elements.deleteScheduleBtn.style.display = 'none';
         return true;
     } catch (error) {
-        showToast('ワーカー停止に失敗しました', 'error');
+        showToast(`削除失敗: ${error.message}`, 'error');
         return false;
+    }
+}
+
+async function validateFolderUrl() {
+    const folderUrl = elements.scheduleFolderUrl?.value?.trim();
+    if (!folderUrl) {
+        showToast('フォルダURLを入力してください', 'error');
+        return;
+    }
+
+    if (elements.folderValidationStatus) {
+        elements.folderValidationStatus.textContent = '検証中...';
+        elements.folderValidationStatus.className = 'validation-status validating';
+    }
+
+    try {
+        const response = await fetch('/settings/schedule/validate-folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder_url: folderUrl }),
+        });
+        const result = await response.json();
+
+        if (result.valid) {
+            if (elements.folderValidationStatus) {
+                elements.folderValidationStatus.textContent = `✓ ${result.folder_name}`;
+                elements.folderValidationStatus.className = 'validation-status valid';
+            }
+            showToast(`フォルダ「${result.folder_name}」にアクセスできます`, 'success');
+        } else {
+            if (elements.folderValidationStatus) {
+                elements.folderValidationStatus.textContent = `✗ ${result.error}`;
+                elements.folderValidationStatus.className = 'validation-status invalid';
+            }
+            showToast(result.error || '無効なフォルダURL', 'error');
+        }
+    } catch (error) {
+        if (elements.folderValidationStatus) {
+            elements.folderValidationStatus.textContent = '✗ 検証エラー';
+            elements.folderValidationStatus.className = 'validation-status invalid';
+        }
+        showToast('フォルダ検証に失敗しました', 'error');
+    }
+}
+
+function updateScheduleStatusDisplay(enabled) {
+    if (elements.scheduleStatus) {
+        elements.scheduleStatus.textContent = enabled ? '有効' : '無効';
+        elements.scheduleStatus.className = enabled ? 'schedule-status enabled' : 'schedule-status disabled';
+    }
+}
+
+function populateScheduleForm(settings) {
+    if (!settings) return;
+
+    // Populate unified settings fields
+    if (elements.scheduleMaxFiles) elements.scheduleMaxFiles.value = settings.max_files_per_run || 50;
+    if (elements.titleTemplate) elements.titleTemplate.value = settings.title_template || '{filename}';
+    if (elements.descriptionTemplate) elements.descriptionTemplate.value = settings.description_template || '';
+    if (elements.privacyStatus) elements.privacyStatus.value = settings.default_privacy || 'private';
+    if (elements.recursiveCheck) elements.recursiveCheck.checked = settings.recursive ?? true;
+    if (elements.skipDuplicatesCheck) elements.skipDuplicatesCheck.checked = settings.skip_duplicates ?? true;
+    if (elements.includeMd5Check) elements.includeMd5Check.checked = settings.include_md5_hash ?? true;
+    if (elements.scheduleEnabled) elements.scheduleEnabled.checked = settings.is_enabled ?? false;
+    updateScheduleStatusDisplay(settings.is_enabled);
+    if (elements.deleteScheduleBtn) elements.deleteScheduleBtn.style.display = 'inline-block';
+
+    // Set folder from saved settings if available
+    if (settings.folder_id && settings.folder_url) {
+        if (elements.folderId) elements.folderId.value = settings.folder_id;
+        if (elements.folderPath) elements.folderPath.value = settings.folder_name || settings.folder_id;
+        if (elements.uploadSettings) elements.uploadSettings.style.display = 'block';
+        if (elements.videoPreview) elements.videoPreview.style.display = 'block';
+    }
+}
+
+async function cancelJob(jobId) {
+    if (!confirm('このジョブをキャンセルしてもよろしいですか？')) return;
+
+    try {
+        const response = await fetch(`/queue/jobs/${jobId}/cancel`, { method: 'POST' });
+        if (!response.ok) {
+            // Handle both JSON and non-JSON error responses
+            const contentType = response.headers.get('content-type');
+            let errorMessage = 'Failed to cancel job';
+            if (contentType && contentType.includes('application/json')) {
+                const error = await response.json();
+                errorMessage = error.detail || errorMessage;
+            } else {
+                // Non-JSON response (e.g., "Internal Server Error")
+                const text = await response.text();
+                errorMessage = text || `HTTP ${response.status}`;
+            }
+            throw new Error(errorMessage);
+        }
+        showToast('ジョブをキャンセルしました', 'success');
+        refreshQueueList();
+    } catch (error) {
+        showToast(`キャンセル失敗: ${error.message}`, 'error');
+    }
+}
+
+async function deleteJob(jobId) {
+    if (!confirm('このジョブを削除してもよろしいですか？\n\n注意: アップロード履歴からも完全に削除されます。')) return;
+
+    try {
+        const response = await fetch(`/queue/jobs/${jobId}`, { method: 'DELETE' });
+        if (!response.ok) {
+            // Handle both JSON and non-JSON error responses
+            const contentType = response.headers.get('content-type');
+            let errorMessage = 'Failed to delete job';
+            if (contentType && contentType.includes('application/json')) {
+                const error = await response.json();
+                errorMessage = error.detail || errorMessage;
+            } else {
+                const text = await response.text();
+                errorMessage = text || `HTTP ${response.status}`;
+            }
+            throw new Error(errorMessage);
+        }
+        showToast('ジョブを削除しました', 'success');
+        refreshQueueList();
+    } catch (error) {
+        showToast(`削除失敗: ${error.message}`, 'error');
+    }
+}
+
+async function updateQuotaStatus() {
+    if (!elements.quotaStatus) return;
+
+    try {
+        const response = await fetch('/youtube/quota');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const percent = data.usage_percentage;
+        const remaining = data.remaining;
+
+        elements.quotaStatus.style.display = 'flex';
+        const quotaText = elements.quotaStatus.querySelector('.quota-text');
+
+        if (percent >= 100) {
+            quotaText.textContent = '100% (上限到達)';
+            elements.quotaStatus.classList.add('error');
+        } else {
+            quotaText.textContent = `${percent}% (残: ${remaining})`;
+            elements.quotaStatus.classList.remove('error');
+            if (percent > 80) {
+                elements.quotaStatus.classList.add('warning');
+            } else {
+                elements.quotaStatus.classList.remove('warning');
+            }
+        }
+    } catch (error) {
+        console.error('Failed to update quota:', error);
     }
 }
 
@@ -197,14 +429,20 @@ async function loadFolderContents(folderId) {
 
         item.innerHTML = `${icon}<span>${file.name}</span>`;
 
-        item.addEventListener('click', () => {
-            if (file.file_type === 'folder') {
-                // Double-click to enter folder
-                item.addEventListener('dblclick', () => {
-                    navigateToFolder(file.id, file.name);
-                });
+        item.addEventListener('click', (e) => {
+            // Prevent double-click from firing twice
+            if (isNavigating) {
+                console.log('[FolderBrowser] Navigation in progress, ignoring click');
+                return;
             }
-            // Select this item
+
+            if (file.file_type === 'folder') {
+                // Single-click to enter folder for easier navigation
+                console.log(`[FolderBrowser] Navigating to folder: ${file.name} (${file.id})`);
+                navigateToFolder(file.id, file.name);
+                return;
+            }
+            // For non-folder items (videos), select them
             document.querySelectorAll('.folder-item.selected').forEach(el => el.classList.remove('selected'));
             item.classList.add('selected');
             selectedFolderId = file.id;
@@ -217,6 +455,26 @@ async function loadFolderContents(folderId) {
 }
 
 function navigateToFolder(folderId, folderName) {
+    // Debounce: prevent rapid navigation (e.g., double-click)
+    if (isNavigating) {
+        console.log(`[FolderBrowser] Ignoring duplicate navigation to: ${folderName}`);
+        return;
+    }
+    isNavigating = true;
+
+    // Validate folder ID
+    if (!folderId || typeof folderId !== 'string') {
+        console.error(`[FolderBrowser] Invalid folder ID: ${folderId}`);
+        isNavigating = false;
+        return;
+    }
+
+    console.log(`[FolderBrowser] Navigating to: ${folderName} (${folderId})`);
+
+    // Update current folder tracking for "Select current folder" functionality
+    currentFolderId = folderId;
+    currentFolderName = folderName;
+
     // Update breadcrumb
     if (elements.breadcrumb) {
         const item = document.createElement('span');
@@ -228,19 +486,57 @@ function navigateToFolder(folderId, folderName) {
             while (item.nextSibling) {
                 item.nextSibling.remove();
             }
+            currentFolderId = folderId;
+            currentFolderName = folderName;
             loadFolderContents(folderId);
         });
         elements.breadcrumb.appendChild(item);
     }
-    loadFolderContents(folderId);
+
+    loadFolderContents(folderId).finally(() => {
+        // Release debounce after navigation completes
+        setTimeout(() => {
+            isNavigating = false;
+        }, 100);
+    });
+}
+
+function selectCurrentFolder() {
+    if (!currentFolderId) return;
+
+    // Set variables as if selected from list
+    selectedFolderId = currentFolderId;
+    selectedFolderName = currentFolderName; // This might be "My Drive" or last folder name
+
+    selectFolder();
 }
 
 function selectFolder() {
-    if (!selectedFolderId) return;
+    // If nothing selected but we're in a subfolder, select current folder
+    if (!selectedFolderId && currentFolderId && currentFolderId !== 'root') {
+        selectedFolderId = currentFolderId;
+        selectedFolderName = currentFolderName;
+    }
+
+    if (!selectedFolderId) {
+        showToast('フォルダを選択してください', 'warning');
+        return;
+    }
+
+    // Validate folder URL format
+    const folderUrl = `https://drive.google.com/drive/folders/${selectedFolderId}`;
+    if (!/^[a-zA-Z0-9_-]+$/.test(selectedFolderId)) {
+        console.error(`[FolderBrowser] Invalid folder ID format: ${selectedFolderId}`);
+        showToast('不正なフォルダIDです', 'error');
+        return;
+    }
+    console.log(`[FolderBrowser] Selected folder: ${selectedFolderName} (${selectedFolderId})`);
+    console.log(`[FolderBrowser] Folder URL: ${folderUrl}`);
 
     if (elements.folderPath) elements.folderPath.value = selectedFolderName || 'Selected Folder';
     if (elements.folderId) elements.folderId.value = selectedFolderId;
 
+    // Update current folder for schedule settings
     currentFolderId = selectedFolderId;
     currentFolderName = selectedFolderName;
 
@@ -410,6 +706,9 @@ async function refreshQueueList() {
     elements.queueList.innerHTML = '';
 
     data.jobs.forEach(job => {
+        // Skip completed jobs - they're automatically in upload_history
+        if (job.status === 'completed') return;
+
         const item = document.createElement('div');
         item.className = `queue-item status-${job.status}`;
 
@@ -417,25 +716,28 @@ async function refreshQueueList() {
             ? `<div class="progress-bar"><div class="progress-fill" style="width: ${job.progress}%"></div></div>`
             : '';
 
+        let actionBtn = '';
+        if (job.status === 'pending' || job.status === 'downloading') {
+            actionBtn = `<button class="btn-icon btn-cancel" onclick="cancelJob('${job.id}')" title="キャンセル">⛔</button>`;
+        } else if (job.status !== 'uploading') {
+            // Completed, failed, cancelled can be deleted
+            // Uploading cannot be cancelled (safely) or deleted yet in this simple UI
+            actionBtn = `<button class="btn-icon btn-delete" onclick="deleteJob('${job.id}')" title="削除">🗑️</button>`;
+        }
+
         item.innerHTML = `
             <div class="job-info">
                 <span class="job-name">${job.drive_file_name}</span>
                 <span class="job-status">${job.status} ${job.message ? '- ' + job.message : ''}</span>
             </div>
             ${progressBar}
+            ${actionBtn}
         `;
 
         elements.queueList.appendChild(item);
     });
 
-    // Update worker buttons
-    if (data.status?.is_processing) {
-        if (elements.startWorkerBtn) elements.startWorkerBtn.disabled = true;
-        if (elements.stopWorkerBtn) elements.stopWorkerBtn.disabled = false;
-    } else {
-        if (elements.startWorkerBtn) elements.startWorkerBtn.disabled = false;
-        if (elements.stopWorkerBtn) elements.stopWorkerBtn.disabled = true;
-    }
+    // Update progress section
     // 進捗状況セクションの更新を追加
     const activeJobs = data.jobs.filter(j =>
         j.status === 'downloading' || j.status === 'uploading'
@@ -476,7 +778,14 @@ async function refreshQueueList() {
 document.addEventListener('DOMContentLoaded', () => {
     // Browse folders button
     if (elements.browseBtn) {
-        elements.browseBtn.addEventListener('click', openModal);
+        elements.browseBtn.addEventListener('click', () => {
+            openModal();
+            // Reset select current folder button text
+            if (elements.selectCurrentFolderBtn) {
+                elements.selectCurrentFolderBtn.textContent = 'このフォルダを選択';
+                elements.selectCurrentFolderBtn.disabled = false;
+            }
+        });
     }
 
     // Modal controls
@@ -514,21 +823,19 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.addToQueueBtn.addEventListener('click', addToQueue);
     }
 
-    // Worker controls
-    if (elements.startWorkerBtn) {
-        elements.startWorkerBtn.addEventListener('click', async () => {
-            if (await startWorker()) {
-                elements.startWorkerBtn.disabled = true;
-                elements.stopWorkerBtn.disabled = false;
-            }
-        });
+    // Schedule Settings
+    if (elements.saveScheduleBtn) {
+        elements.saveScheduleBtn.addEventListener('click', saveScheduleSettings);
     }
-    if (elements.stopWorkerBtn) {
-        elements.stopWorkerBtn.addEventListener('click', async () => {
-            if (await stopWorker()) {
-                elements.startWorkerBtn.disabled = false;
-                elements.stopWorkerBtn.disabled = true;
-            }
+    if (elements.deleteScheduleBtn) {
+        elements.deleteScheduleBtn.addEventListener('click', deleteScheduleSettings);
+    }
+    if (elements.validateFolderBtn) {
+        elements.validateFolderBtn.addEventListener('click', validateFolderUrl);
+    }
+    if (elements.scheduleEnabled) {
+        elements.scheduleEnabled.addEventListener('change', (e) => {
+            updateScheduleStatusDisplay(e.target.checked);
         });
     }
 
@@ -541,9 +848,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Initial queue refresh
+    // Select Current Folder button
+    if (elements.selectCurrentFolderBtn) {
+        elements.selectCurrentFolderBtn.addEventListener('click', selectCurrentFolder);
+    }
+
+    // Initial data load
     refreshQueueList();
+    updateQuotaStatus();
+
+    // Load schedule settings
+    loadScheduleSettings().then(settings => {
+        if (settings) populateScheduleForm(settings);
+    });
 
     // Periodic queue refresh
-    setInterval(refreshQueueList, 5000);
+    setInterval(() => {
+        refreshQueueList();
+        updateQuotaStatus();
+    }, 5000);
 });

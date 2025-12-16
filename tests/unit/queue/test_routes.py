@@ -45,18 +45,6 @@ def mock_queue_repo():
 
 
 @pytest.fixture
-def mock_queue_worker():
-    """Mock queue worker for tests."""
-    with patch("app.queue.routes.get_queue_worker") as mock:
-        worker = MagicMock()
-        worker.is_running.return_value = True
-        worker.start = AsyncMock()
-        worker.stop = AsyncMock()
-        mock.return_value = worker
-        yield worker
-
-
-@pytest.fixture
 def test_client_with_mocks(mock_queue_repo):
     """Create test client with mocked dependencies."""
     from app.core.dependencies import get_queue_repository, get_user_id_from_session
@@ -248,6 +236,89 @@ class TestCancelJob:
         response = test_client_with_mocks.post(f"/queue/jobs/{sample_job.id}/cancel")
 
         assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["job"]["status"] == "cancelled"
+        assert data["message"] == "Job cancelled"
+
+    @staticmethod
+    def test_cancel_job_downloading_success(mock_queue_repo, sample_job, test_client_with_mocks):
+        """Test cancelling a job that is currently downloading."""
+        downloading_job = sample_job.model_copy(
+            update={"status": JobStatus.DOWNLOADING, "message": "Starting download from Google Drive..."}
+        )
+        mock_queue_repo.get_job = AsyncMock(return_value=downloading_job)
+        cancelled_job = downloading_job.model_copy(
+            update={"status": JobStatus.CANCELLED, "message": "Cancelled by user"}
+        )
+        mock_queue_repo.cancel_job = AsyncMock(return_value=cancelled_job)
+
+        response = test_client_with_mocks.post(f"/queue/jobs/{downloading_job.id}/cancel")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["job"]["status"] == "cancelled"
+
+    @staticmethod
+    def test_cancel_job_not_found(mock_queue_repo, sample_job_id, test_client_with_mocks):
+        """Test cancelling a job that doesn't exist."""
+        mock_queue_repo.get_job = AsyncMock(return_value=None)
+
+        response = test_client_with_mocks.post(f"/queue/jobs/{sample_job_id}/cancel")
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        data = response.json()
+        assert data["detail"] == "Job not found"
+
+    @staticmethod
+    def test_cancel_job_access_denied(mock_queue_repo, sample_job, test_client_with_mocks):
+        """Test cancelling a job that belongs to another user."""
+        other_user_job = sample_job.model_copy(update={"user_id": "other_user"})
+        mock_queue_repo.get_job = AsyncMock(return_value=other_user_job)
+
+        response = test_client_with_mocks.post(f"/queue/jobs/{other_user_job.id}/cancel")
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        data = response.json()
+        assert data["detail"] == "Access denied"
+
+    @staticmethod
+    def test_cancel_job_uploading_fails(mock_queue_repo, sample_job, test_client_with_mocks):
+        """Test that jobs in uploading state cannot be cancelled."""
+        uploading_job = sample_job.model_copy(update={"status": JobStatus.UPLOADING})
+        mock_queue_repo.get_job = AsyncMock(return_value=uploading_job)
+        mock_queue_repo.cancel_job = AsyncMock(return_value=None)  # Repository returns None for non-cancellable
+
+        response = test_client_with_mocks.post(f"/queue/jobs/{uploading_job.id}/cancel")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        data = response.json()
+        assert data["detail"] == "Job cannot be cancelled"
+
+    @staticmethod
+    def test_cancel_job_completed_fails(mock_queue_repo, sample_job, test_client_with_mocks):
+        """Test that completed jobs cannot be cancelled."""
+        completed_job = sample_job.model_copy(update={"status": JobStatus.COMPLETED})
+        mock_queue_repo.get_job = AsyncMock(return_value=completed_job)
+        mock_queue_repo.cancel_job = AsyncMock(return_value=None)
+
+        response = test_client_with_mocks.post(f"/queue/jobs/{completed_job.id}/cancel")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        data = response.json()
+        assert data["detail"] == "Job cannot be cancelled"
+
+    @staticmethod
+    def test_cancel_job_failed_fails(mock_queue_repo, sample_job, test_client_with_mocks):
+        """Test that failed jobs cannot be cancelled."""
+        failed_job = sample_job.model_copy(update={"status": JobStatus.FAILED})
+        mock_queue_repo.get_job = AsyncMock(return_value=failed_job)
+        mock_queue_repo.cancel_job = AsyncMock(return_value=None)
+
+        response = test_client_with_mocks.post(f"/queue/jobs/{failed_job.id}/cancel")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        data = response.json()
+        assert data["detail"] == "Job cannot be cancelled"
 
 
 @pytest.mark.unit
@@ -303,22 +374,4 @@ class TestClearCompleted:
         data = response.json()
         assert data["cleared_count"] == 5
 
-
-@pytest.mark.unit
-class TestWorkerControl:
-    """Tests for worker control endpoints."""
-
-    @staticmethod
-    def test_start_worker(test_client, mock_queue_worker):
-        """Test starting the worker."""
-        response = test_client.post("/queue/worker/start")
-
-        assert response.status_code == status.HTTP_200_OK
-
-    @staticmethod
-    def test_stop_worker(test_client, mock_queue_worker):
-        """Test stopping the worker."""
-        response = test_client.post("/queue/worker/stop")
-
-        assert response.status_code == status.HTTP_200_OK
 
