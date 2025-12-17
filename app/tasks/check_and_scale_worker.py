@@ -20,6 +20,7 @@ from app.config import get_settings
 from app.core.heroku_client import HerokuClient
 from app.database import close_db, get_db_context, init_db
 from app.queue.repositories import QueueRepository
+from app.youtube.quota import get_quota_tracker
 
 # Configure logging
 logging.basicConfig(
@@ -54,6 +55,30 @@ async def check_queue_has_jobs() -> bool:
         return False
 
 
+def check_quota_available() -> bool:
+    """Check if there's enough quota for at least one video upload.
+    
+    Returns:
+        True if quota is available for videos.insert
+    """
+    tracker = get_quota_tracker()
+    can_upload = tracker.can_perform("videos.insert")
+    
+    if can_upload:
+        remaining = tracker.get_remaining_quota()
+        logger.info("Quota available: %d units remaining", remaining)
+    else:
+        usage_summary = tracker.get_usage_summary()
+        logger.warning(
+            "Quota exhausted: %d/%d units used (%.1f%%)",
+            usage_summary["total_used"],
+            usage_summary["daily_limit"],
+            usage_summary["usage_percentage"],
+        )
+    
+    return can_upload
+
+
 async def check_and_scale_worker() -> None:
     """Main entry point: check queue and scale worker accordingly."""
     logger.info("=" * 60)
@@ -82,10 +107,22 @@ async def check_and_scale_worker() -> None:
         )
 
         if has_jobs:
-            # Ensure worker is running
-            logger.info("Jobs found - ensuring worker is running...")
-            await heroku.ensure_worker_running()
-            logger.info("Worker dyno is running")
+            # Check quota before starting worker
+            quota_available = check_quota_available()
+            
+            if quota_available:
+                # Ensure worker is running
+                logger.info("Jobs found and quota available - ensuring worker is running...")
+                await heroku.ensure_worker_running()
+                logger.info("Worker dyno is running")
+            else:
+                # Don't start worker if quota is exhausted
+                logger.warning(
+                    "Jobs found but quota exhausted - not starting worker. "
+                    "Quota resets at midnight PST."
+                )
+                await heroku.stop_worker()
+                logger.info("Worker dyno stopped due to quota limit")
         else:
             # Stop worker to save resources
             logger.info("No jobs - stopping worker to save dyno hours...")
