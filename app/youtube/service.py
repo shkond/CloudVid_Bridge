@@ -293,7 +293,7 @@ class YouTubeService:
         try:
             # Get Drive service (prefer provided credentials, otherwise fallback)
             if drive_credentials:
-                drive_service = DriveService(drive_credentials)
+                drive_service = DriveService(credentials=drive_credentials)
             else:
                 drive_service = get_drive_service()
 
