@@ -140,6 +140,27 @@ export async function deleteJobApi(jobId) {
 }
 
 /**
+ * Clear all failed jobs from the queue
+ * @returns {Promise<Object>} Result with cleared count
+ */
+export async function clearFailedJobsApi() {
+    const response = await fetch('/queue/clear-failed', { method: 'POST' });
+    if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        let errorMessage = 'Failed to clear failed jobs';
+        if (contentType && contentType.includes('application/json')) {
+            const error = await response.json();
+            errorMessage = error.detail || errorMessage;
+        } else {
+            const text = await response.text();
+            errorMessage = text || `HTTP ${response.status}`;
+        }
+        throw new Error(errorMessage);
+    }
+    return await response.json();
+}
+
+/**
  * Get YouTube quota status
  * @returns {Promise<Object|null>} Quota data or null on error
  */

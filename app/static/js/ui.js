@@ -16,6 +16,7 @@ export const elements = {
     addToQueueBtn: document.getElementById('add-to-queue'),
     queueList: document.getElementById('queue-list'),
     queueCount: document.getElementById('queue-count'),
+    clearFailedJobsBtn: document.getElementById('clear-failed-jobs'),
     progressInfo: document.getElementById('progress-info'),
     // Modal
     modal: document.getElementById('folder-modal'),

@@ -11,7 +11,7 @@ import {
     selectCurrentFolder,
     resetBreadcrumb
 } from './folder-browser.js';
-import { refreshQueueList, performScan, addToQueue } from './queue.js';
+import { refreshQueueList, performScan, addToQueue, clearFailedJobs } from './queue.js';
 import {
     loadScheduleSettings,
     populateScheduleForm,
@@ -69,6 +69,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add to queue button
     if (elements.addToQueueBtn) {
         elements.addToQueueBtn.addEventListener('click', addToQueue);
+    }
+
+    // Clear failed jobs button
+    if (elements.clearFailedJobsBtn) {
+        elements.clearFailedJobsBtn.addEventListener('click', clearFailedJobs);
     }
 
     // Schedule Settings

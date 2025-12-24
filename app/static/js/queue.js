@@ -3,7 +3,7 @@
  * Queue management and display functions
  */
 
-import { getQueueStatus, cancelJobApi, deleteJobApi, uploadFolder } from './api.js';
+import { getQueueStatus, cancelJobApi, deleteJobApi, clearFailedJobsApi, uploadFolder } from './api.js';
 import { elements, showToast, flattenVideos, renderVideoList } from './ui.js';
 import { scanFolder } from './api.js';
 import { currentFolderId } from './folder-browser.js';
@@ -223,6 +223,22 @@ export async function addToQueue() {
     }
 }
 
+/**
+ * Clear all failed jobs from the queue
+ */
+export async function clearFailedJobs() {
+    if (!confirm('すべてのエラージョブを削除してもよろしいですか？')) return;
+
+    try {
+        const result = await clearFailedJobsApi();
+        showToast(`${result.cleared_count}件のエラージョブを削除しました`, 'success');
+        refreshQueueList();
+    } catch (error) {
+        showToast(`削除失敗: ${error.message}`, 'error');
+    }
+}
+
 // Make functions available globally for inline onclick handlers (legacy support)
 window.cancelJob = cancelJob;
 window.deleteJob = deleteJob;
+window.clearFailedJobs = clearFailedJobs;

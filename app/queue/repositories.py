@@ -370,6 +370,28 @@ class QueueRepository(QueueRepositoryProtocol):
         logger.info(f"Cleared {cleared_count} completed jobs")
         return cleared_count
 
+    async def clear_failed(self, user_id: str | None = None) -> int:
+        """Clear all failed jobs from the queue.
+
+        Args:
+            user_id: Optional user ID to filter by
+
+        Returns:
+            Number of jobs cleared
+        """
+        query = delete(QueueJobModel).where(
+            QueueJobModel.status == JobStatus.FAILED.value
+        )
+
+        if user_id:
+            query = query.where(QueueJobModel.user_id == user_id)
+
+        result = await self._db.execute(query)
+        cleared_count = result.rowcount
+
+        logger.info(f"Cleared {cleared_count} failed jobs")
+        return cleared_count
+
     async def is_file_id_in_queue(self, drive_file_id: str) -> bool:
         """Check if a file ID is already in the queue (pending or active).
 

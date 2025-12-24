@@ -317,6 +317,24 @@ async def clear_completed(
     return {"message": f"Cleared {count} job(s)", "cleared_count": count}
 
 
+@router.post("/clear-failed")
+async def clear_failed(
+    queue_repo: QueueRepository = Depends(get_queue_repository),
+    user_id: str = Depends(get_user_id_from_session),
+) -> dict:
+    """Clear all failed jobs for the current user.
+
+    Args:
+        queue_repo: Queue repository (injected via DI)
+        user_id: Current user ID (injected via DI)
+
+    Returns:
+        Number of jobs cleared
+    """
+    count = await queue_repo.clear_failed(user_id=user_id)
+    return {"message": f"Cleared {count} failed job(s)", "cleared_count": count}
+
+
 async def _start_worker() -> None:
     """Start the queue worker (used as background task for auto-start).
     
